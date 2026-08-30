@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "z1"
+version = "0.1.0"
+description = "z1 - 125M Coding-Agent and Reasoning AI (zone.ai)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "torch>=2.0.0",
+    "tokenizers>=0.13.0",
+    "datasets>=2.10.0",
+    "einops>=0.6.0",
+    "tqdm>=4.65.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["z1*"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]

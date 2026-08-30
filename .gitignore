@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+checkpoints/
+data/*.bin
+data/*.jsonl
+z1_tokenizer.json
+*.log
+.env
+wandb/
+.pytest_cache/
