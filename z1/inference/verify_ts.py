@@ -1,41 +1,65 @@
 """
-TypeScript self-verification and self-correction loop at inference.
-Executes verification on generated TypeScript code, feeding compiler errors back to the model for correction.
+TypeScript self-verification and self-correction loop.
+
+Primary checker: tsc --noEmit.
+Fallback: z1.eval bracket/string-balance heuristic (marked as heuristic, verified=False).
 """
 import os
-import re
 import shutil
 import tempfile
 import subprocess
-from typing import Dict, Any, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from z1.eval import check_javascript_syntax_heuristic
+from z1.inference.verify_base import (
+    VerifyResult,
+    extract_code_block,
+    self_correcting_generate,
+)
 
 
-def extract_code_block(text: str, default_lang: str = "typescript") -> str:
-    """Extract code block from <code> tags, markdown code fences, or fallback to raw text."""
-    # 1. Check z1 <code>...</code> tags
-    code_match = re.search(r"<code>\n?(.*?)\n?</code>", text, re.DOTALL)
-    if code_match:
-        return code_match.group(1).strip()
-
-    # 2. Check markdown ```typescript or ```ts or ```
-    fence_match = re.search(r"```(?:ts|typescript|javascript|js)?\n(.*?)```", text, re.DOTALL)
-    if fence_match:
-        return fence_match.group(1).strip()
-
-    return text.strip()
+_SYSTEM_PROMPT = "You are an expert TypeScript engineer. Write valid, type-safe TypeScript code."
 
 
 def run_tsc_check(ts_code: str, timeout: int = 10) -> Dict[str, Any]:
     """
-    Run tsc --noEmit against a temporary TypeScript file if tsc is available.
-    Falls back to heuristic syntax checking from z1.eval if tsc is not found.
+    Run tsc --noEmit against a temporary file.
+    Falls back to the z1.eval heuristic when tsc is not installed.
+    Returns a plain dict (valid, error) for backward compatibility.
     """
+    result = _check_typescript(ts_code, timeout=timeout)
+    return {"valid": result.valid, "error": result.error}
+
+
+def _check_typescript(ts_code: str, timeout: int = 10) -> VerifyResult:
+    """
+    Internal checker returning a VerifyResult.
+    verified=True only when tsc actually ran and passed.
+    """
+    if not ts_code or not ts_code.strip():
+        return VerifyResult(valid=False, verified=False, error="Empty TypeScript code snippet.", checker="none")
+
+    # Fast heuristic pre-check (bracket balance, string balance)
+    heuristic = check_javascript_syntax_heuristic(ts_code)
+    if not heuristic["valid"]:
+        return VerifyResult(
+            valid=False,
+            verified=False,
+            heuristic=True,
+            error=heuristic["error"],
+            checker="heuristic",
+        )
+
     tsc_path = shutil.which("tsc")
     if not tsc_path:
-        # Fallback to z1.eval syntax validator
-        return check_javascript_syntax_heuristic(ts_code)
+        # Heuristic passed but no real compiler: mark explicitly as heuristic
+        return VerifyResult(
+            valid=True,
+            verified=False,
+            heuristic=True,
+            error=None,
+            checker="heuristic",
+        )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         file_path = os.path.join(tmpdir, "verification.ts")
@@ -43,36 +67,35 @@ def run_tsc_check(ts_code: str, timeout: int = 10) -> Dict[str, Any]:
             f.write(ts_code)
 
         try:
-            result = subprocess.run(
+            proc = subprocess.run(
                 [tsc_path, "--noEmit", "--target", "ES2022", "--skipLibCheck", file_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 timeout=timeout,
             )
-            if result.returncode == 0:
-                return {"valid": True, "error": None}
-            else:
-                err_msg = (result.stdout + "\n" + result.stderr).strip()
-                return {"valid": False, "error": err_msg}
+            if proc.returncode == 0:
+                return VerifyResult(valid=True, verified=True, heuristic=False, error=None, checker="tsc")
+            err_msg = (proc.stdout + "\n" + proc.stderr).strip()
+            return VerifyResult(valid=False, verified=False, error=err_msg, checker="tsc")
         except subprocess.TimeoutExpired:
-            return {"valid": False, "error": f"TypeScript compilation timed out after {timeout}s"}
+            return VerifyResult(
+                valid=False,
+                verified=False,
+                error=f"tsc timed out after {timeout}s",
+                checker="tsc",
+            )
         except Exception as e:
-            return {"valid": False, "error": str(e)}
+            return VerifyResult(valid=False, verified=False, error=str(e), checker="tsc")
 
 
 def verify_typescript_code(ts_code: str) -> Dict[str, Any]:
-    """Verify TypeScript code with syntax heuristic and compiler validation."""
-    if not ts_code or not ts_code.strip():
-        return {"valid": False, "error": "Empty TypeScript code snippet."}
-
-    # Fast syntax check from z1.eval
-    syntax_result = check_javascript_syntax_heuristic(ts_code)
-    if not syntax_result["valid"]:
-        return syntax_result
-
-    # Compiler check
-    return run_tsc_check(ts_code)
+    """
+    Verify TypeScript code. Returns {valid, verified, heuristic, error, checker}.
+    verified=True only when tsc ran and passed.
+    """
+    result = _check_typescript(ts_code)
+    return result.to_dict()
 
 
 def self_correcting_generate_ts(
@@ -81,54 +104,20 @@ def self_correcting_generate_ts(
     max_retries: int = 2,
     temperature: float = 0.5,
     top_p: float = 0.9,
-    system_prompt: str = "You are an expert TypeScript engineer. Write valid, type-safe TypeScript code.",
+    system_prompt: str = _SYSTEM_PROMPT,
 ) -> Dict[str, Any]:
     """
-    Generate TypeScript code with self-verification and automatic compiler error correction turns.
-    Returns dictionary with final code, verification status, attempt count, and last error.
+    Generate TypeScript with self-verification and correction loop.
+    Returns {code, verified, heuristic, attempts, error, checker}.
+    verified=True only when tsc ran and passed.
     """
-    current_prompt = prompt
-    last_error: Optional[str] = None
-    last_code = ""
-
-    for attempt in range(1, max_retries + 1):
-        formatted_prompt = generator.format_agent_prompt(
-            system_prompt=system_prompt,
-            user_prompt=current_prompt,
-            include_think_tag=True,
-        )
-
-        response_chunks = list(generator.generate_stream(
-            formatted_prompt,
-            temperature=temperature,
-            top_p=top_p,
-        ))
-        response_text = "".join(response_chunks)
-        extracted_code = extract_code_block(response_text)
-        last_code = extracted_code
-
-        verification = verify_typescript_code(extracted_code)
-        if verification["valid"]:
-            return {
-                "code": extracted_code,
-                "verified": True,
-                "attempts": attempt,
-                "error": None,
-                "raw_response": response_text,
-            }
-
-        last_error = verification.get("error", "Unknown compilation error.")
-        # Construct correction prompt turn for next attempt
-        current_prompt = (
-            f"The previous TypeScript code produced the following compilation error:\n"
-            f"```\n{last_error}\n```\n"
-            f"Original task: {prompt}\n"
-            f"Please fix all errors and provide the complete, working TypeScript solution inside <code> tags."
-        )
-
-    return {
-        "code": last_code,
-        "verified": False,
-        "attempts": max_retries,
-        "error": last_error,
-    }
+    return self_correcting_generate(
+        generator=generator,
+        prompt=prompt,
+        checker=_check_typescript,
+        language="TypeScript",
+        max_retries=max_retries,
+        temperature=temperature,
+        top_p=top_p,
+        system_prompt=system_prompt,
+    )

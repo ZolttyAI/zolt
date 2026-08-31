@@ -1,6 +1,6 @@
 """
 z1 Inference Package.
-Exports generators, diff formatting, TypeScript verification, and structured DB calls.
+Exports generators, diff formatting, verification (TS/JS/Python), and structured DB calls.
 """
 import argparse
 from z1.inference.generator import (
@@ -16,10 +16,28 @@ from z1.inference.diff_format import (
     format_diff_block,
     DiffEdit,
 )
+from z1.inference.verify_base import (
+    VerifyResult,
+    extract_code_block,
+    self_correcting_generate as self_correcting_generate_base,
+)
 from z1.inference.verify_ts import (
     verify_typescript_code,
     self_correcting_generate_ts,
     run_tsc_check,
+)
+from z1.inference.verify_js import (
+    verify_javascript_code,
+    self_correcting_generate_js,
+)
+from z1.inference.verify_python import (
+    verify_python_code,
+    self_correcting_generate_python,
+)
+from z1.inference.verify import (
+    verify_code,
+    self_correcting_generate,
+    SUPPORTED_LANGUAGES,
 )
 from z1.inference.db_call import (
     validate_db_call,
@@ -31,18 +49,34 @@ from z1.inference.db_call import (
 )
 
 __all__ = [
+    # Generator
     "Z1Generator",
     "classify_prompt_complexity",
     "compute_token_entropy",
     "is_factual_claim_token",
+    # Diff format
     "parse_diff_blocks",
     "apply_diff_edit",
     "apply_diff_block",
     "format_diff_block",
     "DiffEdit",
+    # Verification base
+    "VerifyResult",
+    "extract_code_block",
+    "self_correcting_generate_base",
+    # Verifiers
     "verify_typescript_code",
     "self_correcting_generate_ts",
     "run_tsc_check",
+    "verify_javascript_code",
+    "self_correcting_generate_js",
+    "verify_python_code",
+    "self_correcting_generate_python",
+    # Dispatcher
+    "verify_code",
+    "self_correcting_generate",
+    "SUPPORTED_LANGUAGES",
+    # DB call
     "validate_db_call",
     "parse_db_calls",
     "format_db_call",
@@ -59,7 +93,7 @@ def main():
     parser.add_argument("--tokenizer", default="z1_tokenizer.json", help="Path to BPE tokenizer")
     parser.add_argument("--slice", "--active_dim", dest="active_dim", type=int, default=None, help="Active dimension for MatFormer slice (e.g. 384, 512, 768, 1024)")
     parser.add_argument("--auto-slice", "--auto_slice", dest="auto_slice", action="store_true", help="Enable adaptive MatFormer slice routing based on prompt complexity")
-    parser.add_argument("--entropy_threshold", type=float, default=None, help="Output entropy threshold for explicit <uncertain> tag injection")
+    parser.add_argument("--entropy_threshold", type=float, default=None, help="Output entropy threshold for <uncertain> tag injection")
     parser.add_argument("--temp", type=float, default=0.7, help="Sampling temperature")
     parser.add_argument("--top_p", type=float, default=0.9, help="Top-p sampling")
     args = parser.parse_args()
