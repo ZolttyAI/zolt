@@ -10,10 +10,18 @@ import torch
 from torch.utils.data import Dataset, DataLoader, IterableDataset
 
 
+from z1.data.curriculum import (
+    estimate_code_complexity,
+    estimate_token_sequence_complexity,
+    sort_by_curriculum,
+)
+
+
 class PackedSequenceDataset(IterableDataset):
     """
     Sequence packing dataset for causal language modeling.
     Concatenates token streams into fixed-length windows without intra-sequence padding.
+    Supports curriculum difficulty sorting before sequence packing.
     """
 
     def __init__(
@@ -24,6 +32,7 @@ class PackedSequenceDataset(IterableDataset):
         eos_id: int = 2,
         pad_id: int = 0,
         shuffle: bool = True,
+        curriculum: bool = False,
         seed: int = 42,
     ):
         self.token_files = token_files
@@ -31,22 +40,26 @@ class PackedSequenceDataset(IterableDataset):
         self.bos_id = bos_id
         self.eos_id = eos_id
         self.pad_id = pad_id
-        self.shuffle = shuffle
+        self.shuffle = shuffle and not curriculum
+        self.curriculum = curriculum
         self.seed = seed
 
-    def _load_tokens(self, path: str) -> List[int]:
-        """Load int32 binary or JSONL token file into a token list."""
+    def _load_documents(self, path: str) -> List[List[int]]:
+        """Load documents as individual token lists for curriculum sorting and packing."""
         if path.endswith(".bin"):
             import numpy as np
-            return np.fromfile(path, dtype=np.int32).tolist()
+            arr = np.fromfile(path, dtype=np.int32).tolist()
+            return [arr]
         elif path.endswith(".json") or path.endswith(".jsonl"):
             import json
-            tokens = []
+            docs = []
             with open(path) as f:
                 for line in f:
                     obj = json.loads(line)
-                    tokens.extend([self.bos_id] + obj.get("input_ids", []) + [self.eos_id])
-            return tokens
+                    raw_ids = obj.get("input_ids", [])
+                    if raw_ids:
+                        docs.append([self.bos_id] + raw_ids + [self.eos_id])
+            return docs
         else:
             raise ValueError(f"Unsupported file format: {path}")
 
@@ -56,16 +69,22 @@ class PackedSequenceDataset(IterableDataset):
         if self.shuffle:
             rng.shuffle(files)
 
-        buffer: List[int] = []
-
+        all_docs: List[List[int]] = []
         for path in files:
             try:
-                tokens = self._load_tokens(path)
+                docs = self._load_documents(path)
+                all_docs.extend(docs)
             except Exception as e:
                 print(f"[z1-data] Error loading {path}: {e}")
                 continue
 
-            buffer.extend(tokens)
+        if self.curriculum:
+            all_docs = sort_by_curriculum(all_docs, complexity_fn=estimate_token_sequence_complexity)
+
+        buffer: List[int] = []
+
+        for doc in all_docs:
+            buffer.extend(doc)
 
             while len(buffer) >= self.max_seq_len + 1:
                 chunk = buffer[: self.max_seq_len + 1]
@@ -99,9 +118,10 @@ def build_dataloader(
     pad_id: int = 0,
     num_workers: int = 2,
     shuffle: bool = True,
+    curriculum: bool = False,
     seed: int = 42,
 ) -> DataLoader:
-    """Build DataLoader with sequence packing for causal LM training."""
+    """Build DataLoader with sequence packing and optional curriculum staging."""
     dataset = PackedSequenceDataset(
         token_files=token_files,
         max_seq_len=max_seq_len,
@@ -109,6 +129,7 @@ def build_dataloader(
         eos_id=eos_id,
         pad_id=pad_id,
         shuffle=shuffle,
+        curriculum=curriculum,
         seed=seed,
     )
     return DataLoader(

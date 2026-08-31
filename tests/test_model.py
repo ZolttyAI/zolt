@@ -128,3 +128,35 @@ def test_parameter_count(tiny_config):
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     assert n_params > 0
     print(f"\nParameters (tiny_config): {n_params:,}")
+
+
+def test_parameter_count_default_250m():
+    config = Z1Config()
+    model = Z1ForCausalLM(config)
+    n_params = sum(p.numel() for p in model.parameters())
+    # Assert ~250M parameters range
+    assert 240_000_000 <= n_params <= 260_000_000, f"Expected ~250M params, got {n_params:,}"
+
+
+def test_presets_parameter_counts():
+    cfg_125 = Z1Config.preset("125m")
+    m_125 = Z1ForCausalLM(cfg_125)
+    n_125 = sum(p.numel() for p in m_125.parameters())
+    assert 100_000_000 <= n_125 <= 130_000_000, f"Expected ~125M preset, got {n_125:,}"
+
+    cfg_250 = Z1Config.preset("250m")
+    m_250 = Z1ForCausalLM(cfg_250)
+    n_250 = sum(p.numel() for p in m_250.parameters())
+    assert 240_000_000 <= n_250 <= 260_000_000, f"Expected ~250M preset, got {n_250:,}"
+
+
+def test_matformer_slice_250m():
+    cfg = Z1Config.preset("250m")
+    cfg.n_layers = 2  # minimal layers for test speed
+    model = Z1ForCausalLM(cfg)
+    input_ids = torch.randint(0, cfg.vocab_size, (2, 8))
+    labels = torch.randint(0, cfg.vocab_size, (2, 8))
+    logits, loss = model(input_ids, labels=labels, active_dim=512)
+    assert logits.shape == (2, 8, cfg.vocab_size)
+    assert loss is not None
+

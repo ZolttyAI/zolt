@@ -35,11 +35,21 @@ def run_smoke_test():
     n_params = sum(p.numel() for p in model.parameters())
     print(f"✓ Z1ForCausalLM instantiated | params: {n_params:,} ({n_params/1e6:.3f}M) [tiny config]")
 
-    # Parameter count for default 125M architecture
-    real_config = Z1Config()
-    real_model = Z1ForCausalLM(real_config)
-    real_params = sum(p.numel() for p in real_model.parameters())
-    print(f"✓ Target 125M config | params: {real_params:,} ({real_params/1e6:.1f}M)")
+    # Parameter counts for presets and default 250M architecture
+    real_config_250 = Z1Config()
+    real_model_250 = Z1ForCausalLM(real_config_250)
+    real_params_250 = sum(p.numel() for p in real_model_250.parameters())
+    print(f"✓ Target 250M default config | params: {real_params_250:,} ({real_params_250/1e6:.1f}M)")
+
+    preset_125 = Z1Config.preset("125m")
+    model_125 = Z1ForCausalLM(preset_125)
+    params_125 = sum(p.numel() for p in model_125.parameters())
+    print(f"✓ Preset 125M config        | params: {params_125:,} ({params_125/1e6:.1f}M)")
+
+    preset_250 = Z1Config.preset("250m")
+    model_250 = Z1ForCausalLM(preset_250)
+    params_250 = sum(p.numel() for p in model_250.parameters())
+    print(f"✓ Preset 250M config        | params: {params_250:,} ({params_250/1e6:.1f}M)")
 
     # Forward pass
     input_ids = torch.randint(0, config.vocab_size, (2, 16))
@@ -79,12 +89,36 @@ def run_smoke_test():
     assert not tags_bad["valid"], "Unbalanced tags should fail"
     print(f"✓ Eval helpers OK (syntax + reasoning tags)")
 
-    # Data filtering helpers
-    from z1.data.filter_code import is_permissive_license, is_target_language, passes_quality_heuristics
+    # Data filtering and textbook quality score helpers
+    from z1.data.filter_code import (
+        is_permissive_license,
+        is_target_language,
+        passes_quality_heuristics,
+        compute_textbook_quality_score,
+    )
     assert is_permissive_license("MIT")
     assert is_target_language("typescript")
     assert not is_target_language("java")
-    print(f"✓ Data filters OK")
+    sample_code = '"""Module documentation."""\ndef calculate(x: int) -> int:\n    if x > 0:\n        return x * 2\n    return 0\n'
+    q_score = compute_textbook_quality_score(sample_code, lang="python", path_or_repo="tests/test_calc.py")
+    assert 0.0 <= q_score <= 1.0
+    print(f"✓ Data quality scoring OK | sample score: {q_score:.3f}")
+
+    # Curriculum learning and complexity proxy
+    from z1.data.curriculum import estimate_code_complexity, estimate_token_sequence_complexity, sort_by_curriculum
+    c_easy = estimate_code_complexity("def a(): return 1")
+    c_hard = estimate_code_complexity("class Engine:\n    def run(self):\n        for i in range(10):\n            if i % 2 == 0:\n                try:\n                    pass\n                except Exception:\n                    pass")
+    assert c_easy < c_hard
+    sorted_items = sort_by_curriculum(["def hard_func():\n    if True:\n        for x in y:\n            return x", "x = 1"])
+    assert sorted_items[0] == "x = 1"
+    print(f"✓ Curriculum staging OK | easy: {c_easy:.1f}, hard: {c_hard:.1f}")
+
+    # Teacher distillation synthetic generation
+    from z1.data.distill import generate_synthetic_instance, mix_datasets
+    synth = generate_synthetic_instance(None, {"lang": "python", "topic": "sorting"}, mock_mode=True)
+    assert "<think>" in synth["content"]
+    assert synth["license"] == "synthetic"
+    print(f"✓ Teacher distillation pipeline OK")
 
     # Tokenizer special tokens
     from z1.tokenizer.train_tokenizer import Z1_SPECIAL_TOKENS

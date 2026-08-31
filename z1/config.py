@@ -4,15 +4,16 @@ from typing import Optional, List, Dict, Any
 @dataclasses.dataclass
 class Z1Config:
     """
-    Configuration for z1 (zone.ai) 125M Coding-Agent and Reasoning model.
+    Configuration for z1 (zone.ai) Coding-Agent and Reasoning model.
+    Default architecture targets ~250M parameters with 125M preset support.
     """
     vocab_size: int = 32000
-    dim: int = 768
-    n_layers: int = 12
-    n_heads: int = 12
+    dim: int = 1024
+    n_layers: int = 16
+    n_heads: int = 16
     n_kv_heads: Optional[int] = None
-    hidden_dim: Optional[int] = 2048  # SwiGLU intermediate dimension
-    max_seq_len: int = 4096            # Base sequence length (extended to 16K via RoPE scaling)
+    hidden_dim: Optional[int] = 3072  # SwiGLU intermediate dimension
+    max_seq_len: int = 4096           # Base sequence length (extended to 16K via RoPE scaling)
     rope_theta: float = 10000.0
     rope_scaling_type: Optional[str] = None  # None, "linear", or "ntk"
     rope_scaling_factor: float = 1.0        # e.g., 4.0 to extend 4K -> 16K
@@ -21,7 +22,10 @@ class Z1Config:
 
     # e4b / MatFormer (sparse nested activation support inspired by Gemma 3n)
     matformer_enabled: bool = True
-    matformer_slices: List[int] = dataclasses.field(default_factory=lambda: [384, 768])
+    matformer_slices: List[int] = dataclasses.field(default_factory=lambda: [512, 1024])
+
+    # Overtraining recipe (ratio of training tokens to model parameters, 50x-100x)
+    tokens_per_param_ratio: float = 75.0
 
     # Special Tokens
     pad_token_id: int = 0
@@ -49,3 +53,30 @@ class Z1Config:
     @classmethod
     def from_dict(cls, d: Dict[str, Any]) -> "Z1Config":
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+    @classmethod
+    def preset(cls, name: str) -> "Z1Config":
+        """Load named architecture preset ('125m' or '250m')."""
+        normalized = name.lower().strip()
+        if normalized in ("125m", "125"):
+            return cls(
+                dim=768,
+                n_layers=12,
+                n_heads=12,
+                n_kv_heads=12,
+                hidden_dim=2048,
+                matformer_slices=[384, 768],
+                tokens_per_param_ratio=75.0,
+            )
+        elif normalized in ("250m", "250"):
+            return cls(
+                dim=1024,
+                n_layers=16,
+                n_heads=16,
+                n_kv_heads=16,
+                hidden_dim=3072,
+                matformer_slices=[512, 1024],
+                tokens_per_param_ratio=75.0,
+            )
+        else:
+            raise ValueError(f"Unknown preset '{name}'. Available presets: '125m', '250m'.")

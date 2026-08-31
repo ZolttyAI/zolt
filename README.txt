@@ -2,7 +2,7 @@
 z1
 ================================================================================
 
-Modelo de linguagem causal para geracao de codigo e raciocinio (109.5M parametros, contexto base de 4096 tokens extensivel para 16384 tokens).
+Modelo de linguagem causal para geracao de codigo e raciocinio (250.9M parametros por omissao com predefinicao de 125M, contexto base de 4096 tokens extensivel para 16384 tokens).
 
 
 ARQUITECTURA
@@ -10,16 +10,15 @@ ARQUITECTURA
 Componente                      Especificacao
 --------------------------------------------------------------------------------
 Tipo de Modelo                  Transformador auto-regressivo decoder-only
-Contagem de Parametros          109,529,856 (~109.5M parametros)
+Contagem de Parametros          250,905,600 (~250.9M padrao, 109.5M para 125m)
 Normalizacao                    RMSNorm (epsilon = 1e-6)
-Activacao FFN                   SwiGLU (dimensao oculta = 2048)
+Activacao FFN                   SwiGLU (dimensao oculta = 3072 para 250M, 2048 para 125M)
 Codificacao Posicional          Rotary Position Embeddings (RoPE, theta = 10000.0,
                                 escalonamento Linear e NTK-aware)
-Tipo de Atencao                 Grouped-Query Attention (12 cabecas de query,
-                                12 cabecas de key-value, dimensao da cabeca = 64,
-                                dimensao do modelo = 768)
+Tipo de Atencao                 Grouped-Query Attention (16 cabecas para 250M,
+                                12 cabecas para 125M, dimensao da cabeca = 64)
 Configuracao Esparsa/MatFormer  e4b corte de dimensao para sub-redes aninhadas
-                                (dimensoes activas: 384, 768)
+                                (dimensoes activas: 512, 1024)
 Tokens Especiais                <pad>, <bos>, <eos>, <unk>, <think>, </think>,
                                 <tool_call>, </tool_call>, <tool_response>,
                                 </tool_response>, <code>, </code>,
@@ -44,17 +43,19 @@ z1/
 │   └── setup_runpod.sh            # Script de provisionamento automatico para instancias GPU em nuvem
 ├── smoke_test.py                  # Script de verificacao completa de arquitectura e componentes em CPU
 ├── tests/
-│   ├── test_data.py               # Testes unitarios para filtragem de dados, desduplicacao e sequence packing
-│   ├── test_model.py              # Testes unitarios para blocos do transformador, RoPE, RMSNorm, SwiGLU e geracao
+│   ├── test_data.py               # Testes unitarios para filtragem, qualidade heuristica, curriculum e destilacao
+│   ├── test_model.py              # Testes unitarios para blocos do transformador, RoPE, RMSNorm, SwiGLU e predefinicoes 250M/125M
 │   └── test_tokenizer.py          # Testes unitarios para o tokenizer BPE Byte-Level e tokens especiais
 └── z1/
     ├── __init__.py                # Raiz do pacote exportando classes principais e versao
-    ├── config.py                  # Dataclass Z1Config definindo dimensoes do modelo e hiperparametros
+    ├── config.py                  # Dataclass Z1Config definindo padrao 250M, predefinicao 125M e razao de sobre-treino
     ├── data/
-    │   ├── __init__.py            # Raiz do pacote de dados exportando classes de dataset e dataloader
-    │   ├── dataset.py             # PackedSequenceDataset e DataLoader para causal LM
+    │   ├── __init__.py            # Raiz do pacote de dados exportando datasets, loaders, filtros e curriculum
+    │   ├── curriculum.py          # Utilitarios de pontuacao de complexidade e ordenacao para aprendizagem por curriculum
+    │   ├── dataset.py             # PackedSequenceDataset e DataLoader para causal LM com suporte a curriculum
+    │   ├── distill.py             # Pipeline de destilacao sintetica de modelo professor e mistura de datasets
     │   ├── download.py            # Utilitario de descarregamento de datasets para StarCoderData e The Stack v2
-    │   ├── filter_code.py         # Filtro de licencas, linguagens, qualidade heuristica e desduplicacao SHA256
+    │   ├── filter_code.py         # Filtro de licencas, linguagens, pontuacao de qualidade tipo manual escolar e desduplicacao SHA256
     │   └── pipeline.py            # Orquestrador CLI de processamento de dados ponta a ponta
     ├── eval.py                    # Utilitario de avaliacao para perplexidade, sintaxe e equilibrio de tags de raciocinio
     ├── inference.py               # CLI interactivo e motor de geracao de texto em fluxo
@@ -64,7 +65,7 @@ z1/
     │   ├── __init__.py            # Raiz do pacote do tokenizer exportando Z1Tokenizer
     │   ├── train_tokenizer.py     # Script de treino de tokenizer BPE Byte-Level com tokens especiais
     │   └── z1_tokenizer.py        # Interface de execucao do tokenizer com formatacao de raciocinio e ChatML
-    └── train.py                   # Ciclo de treino causal LM auto-regressivo com precisao mista e AdamW
+    └── train.py                   # Ciclo de treino causal LM com suporte a sobre-treino e curriculum
 
 
 GUIA RAPIDO DE DESENVOLVIMENTO

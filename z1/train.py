@@ -59,17 +59,20 @@ def save_checkpoint(
 def train(
     token_files: List[str],
     output_dir: str = "./checkpoints",
+    preset: Optional[str] = None,
     max_seq_len: int = 4096,
     batch_size: int = 8,
     grad_accum_steps: int = 4,
     lr: float = 3e-4,
     lr_min: float = 3e-5,
     warmup_steps: int = 500,
-    total_steps: int = 100_000,
+    total_steps: Optional[int] = None,
+    tokens_per_param_ratio: float = 75.0,
     weight_decay: float = 0.1,
     grad_clip: float = 1.0,
     save_every: int = 1000,
     log_every: int = 50,
+    curriculum: bool = False,
     resume_from: Optional[str] = None,
     use_wandb: bool = False,
     wandb_project: str = "z1-zone-ai",
@@ -79,11 +82,29 @@ def train(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[z1-train] Device: {device}")
 
-    config = Z1Config(max_seq_len=max_seq_len)
+    if preset:
+        config = Z1Config.preset(preset)
+        config.max_seq_len = max_seq_len
+    else:
+        config = Z1Config(max_seq_len=max_seq_len)
+
     model = Z1ForCausalLM(config).to(device)
 
     n_params = count_parameters(model)
-    print(f"[z1-train] Parameters: {n_params:,} ({n_params/1e6:.1f}M)")
+    print(f"[z1-train] Parameters: {n_params:,} ({n_params/1e6:.1f}M) [preset: {preset or 'default'}]")
+
+    # ─── Overtraining & Token Budget Calculation ────────────────────────────
+    tokens_per_step = batch_size * grad_accum_steps * max_seq_len
+    target_token_budget = int(n_params * tokens_per_param_ratio)
+    if total_steps is None:
+        total_steps = max(1, math.ceil(target_token_budget / max(1, tokens_per_step)))
+
+    regime = "overtraining" if tokens_per_param_ratio > 30.0 else "chinchilla-optimal"
+    print(
+        f"[z1-train] Regime: {regime} ({tokens_per_param_ratio:.1f}x tokens/param) | "
+        f"Target token budget: {target_token_budget:,} ({target_token_budget/1e9:.2f}B tokens) | "
+        f"Total steps: {total_steps:,} ({tokens_per_step:,} tok/step) | Curriculum: {curriculum}"
+    )
 
     # ─── Optimizer ──────────────────────────────────────────────────────────
     # Separate 2D+ weights (decay) and 1D biases/norms (no decay)
@@ -124,6 +145,8 @@ def train(
             "batch_size": batch_size,
             "grad_accum_steps": grad_accum_steps,
             "total_steps": total_steps,
+            "tokens_per_param_ratio": tokens_per_param_ratio,
+            "curriculum": curriculum,
         })
 
     # ─── DataLoader ─────────────────────────────────────────────────────────
@@ -134,6 +157,7 @@ def train(
         bos_id=config.bos_token_id,
         eos_id=config.eos_token_id,
         pad_id=config.pad_token_id,
+        curriculum=curriculum,
     )
 
     # ─── Training Loop ──────────────────────────────────────────────────────
@@ -219,12 +243,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="z1 Training Script")
     parser.add_argument("--token_files", nargs="+", required=True, help="Preprocessed .bin token files")
     parser.add_argument("--output_dir", default="./checkpoints", help="Checkpoint directory")
+    parser.add_argument("--preset", default=None, choices=["125m", "250m"], help="Named architecture preset")
     parser.add_argument("--max_seq_len", type=int, default=4096)
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--grad_accum", type=int, default=4)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--warmup_steps", type=int, default=500)
-    parser.add_argument("--total_steps", type=int, default=100_000)
+    parser.add_argument("--total_steps", type=int, default=None, help="Explicit total steps (or computed from tokens_per_param_ratio)")
+    parser.add_argument("--tokens_per_param_ratio", type=float, default=75.0, help="Tokens/parameter overtraining ratio (50x - 100x)")
+    parser.add_argument("--curriculum", action="store_true", help="Enable progressive complexity curriculum sorting")
     parser.add_argument("--save_every", type=int, default=1000)
     parser.add_argument("--log_every", type=int, default=50)
     parser.add_argument("--resume_from", default=None)
@@ -235,12 +262,15 @@ if __name__ == "__main__":
     train(
         token_files=args.token_files,
         output_dir=args.output_dir,
+        preset=args.preset,
         max_seq_len=args.max_seq_len,
         batch_size=args.batch_size,
         grad_accum_steps=args.grad_accum,
         lr=args.lr,
         warmup_steps=args.warmup_steps,
         total_steps=args.total_steps,
+        tokens_per_param_ratio=args.tokens_per_param_ratio,
+        curriculum=args.curriculum,
         save_every=args.save_every,
         log_every=args.log_every,
         resume_from=args.resume_from,

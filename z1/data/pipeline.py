@@ -20,7 +20,7 @@ def run_step(label: str, fn, *args, **kwargs):
     return result
 
 
-def step_filter_all(raw_dir: str, filtered_dir: str, max_records: int = None):
+def step_filter_all(raw_dir: str, filtered_dir: str, max_records: int = None, min_quality_score: float = 0.0):
     """Filter all raw JSONL files into filtered JSONL files."""
     from z1.data.filter_code import filter_jsonl_file
 
@@ -34,16 +34,24 @@ def step_filter_all(raw_dir: str, filtered_dir: str, max_records: int = None):
         return {}
 
     total_stats = {"total": 0, "accepted": 0, "lang_filtered": 0,
-                   "license_filtered": 0, "quality_filtered": 0, "dedup_filtered": 0}
+                   "license_filtered": 0, "quality_filtered": 0,
+                   "quality_score_filtered": 0, "dedup_filtered": 0}
     seen_hashes = set()  # Global deduplication across all files
 
     for jf in sorted(jsonl_files):
         out_path = filtered_dir / jf.name
         print(f"[z1-pipeline] Filtering: {jf.name}")
-        stats = filter_jsonl_file(str(jf), str(out_path), seen_hashes=seen_hashes, max_records=max_records)
+        stats = filter_jsonl_file(
+            str(jf),
+            str(out_path),
+            seen_hashes=seen_hashes,
+            max_records=max_records,
+            min_quality_score=min_quality_score,
+        )
         for k in total_stats:
             total_stats[k] += stats.get(k, 0)
         print(f"  total={stats['total']:,} | accepted={stats['accepted']:,} | "
+              f"quality_score_filtered={stats.get('quality_score_filtered', 0):,} | "
               f"dedup={stats['dedup_filtered']:,} | lang={stats['lang_filtered']:,} | "
               f"license={stats['license_filtered']:,}")
 
@@ -117,6 +125,7 @@ if __name__ == "__main__":
     p_filter = subparsers.add_parser("filter", help="Filter raw JSONL -> filtered JSONL")
     p_filter.add_argument("--raw_dir", default="data/raw")
     p_filter.add_argument("--filtered_dir", default="data/filtered")
+    p_filter.add_argument("--min_quality_score", type=float, default=0.0)
     p_filter.add_argument("--max_records", type=int, default=None)
 
     # tokenizer
@@ -142,12 +151,13 @@ if __name__ == "__main__":
     p_all.add_argument("--tokenizer", default="z1_tokenizer.json")
     p_all.add_argument("--tokens_dir", default="data/tokens")
     p_all.add_argument("--vocab_size", type=int, default=32000)
+    p_all.add_argument("--min_quality_score", type=float, default=0.0)
     p_all.add_argument("--max_records", type=int, default=None)
 
     args = parser.parse_args()
 
     if args.command == "filter":
-        step_filter_all(args.raw_dir, args.filtered_dir, args.max_records)
+        step_filter_all(args.raw_dir, args.filtered_dir, args.max_records, args.min_quality_score)
     elif args.command == "train-tokenizer":
         step_train_tokenizer(args.filtered_dir, args.output, args.vocab_size)
     elif args.command == "tokenize":
@@ -155,7 +165,7 @@ if __name__ == "__main__":
     elif args.command == "validate":
         step_validate_tokens(args.tokens_dir)
     elif args.command == "all":
-        run_step("1. Filter data", step_filter_all, args.raw_dir, args.filtered_dir, args.max_records)
+        run_step("1. Filter data", step_filter_all, args.raw_dir, args.filtered_dir, args.max_records, args.min_quality_score)
         run_step("2. Train tokenizer", step_train_tokenizer, args.filtered_dir, args.tokenizer, args.vocab_size)
         run_step("3. Tokenize data", step_tokenize_all, args.filtered_dir, args.tokenizer, args.tokens_dir)
         run_step("4. Validate tokens", step_validate_tokens, args.tokens_dir)

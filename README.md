@@ -1,18 +1,18 @@
 # z1
 
-Causal language model for code generation and reasoning (109.5M parameters, 4096 base context extendable to 16384 tokens).
+Causal language model for code generation and reasoning (250.9M default parameters with 125M preset, 4096 base context extendable to 16384 tokens).
 
 ## Architecture
 
 | Component | Specification |
 |---|---|
 | Model Type | Decoder-only autoregressive transformer |
-| Parameter Count | 109,529,856 (~109.5M parameters) |
+| Parameter Count | 250,905,600 (~250.9M default, 109.5M for 125m preset) |
 | Normalization | RMSNorm (epsilon = 1e-6) |
-| FFN Activation | SwiGLU (hidden dimension = 2048) |
+| FFN Activation | SwiGLU (hidden dimension = 3072 for 250M, 2048 for 125M) |
 | Positional Encoding | Rotary Position Embeddings (RoPE, theta = 10000.0, Linear and NTK-aware scaling) |
-| Attention Type | Grouped-Query Attention (12 query heads, 12 key-value heads, head dimension = 64, model dimension = 768) |
-| Sparse / MatFormer Config | e4b nested sub-network dimension slicing (active dimensions: 384, 768) |
+| Attention Type | Grouped-Query Attention (16 heads for 250M, 12 heads for 125M, head dimension = 64) |
+| Sparse / MatFormer Config | e4b nested sub-network dimension slicing (active dimensions: 512, 1024) |
 | Special Tokens | `<pad>`, `<bos>`, `<eos>`, `<unk>`, `<think>`, `</think>`, `<tool_call>`, `</tool_call>`, `<tool_response>`, `</tool_response>`, `<code>`, `</code>`, `<\|im_start\|>`, `<\|im_end\|>`, `<FILL>`, `<PREFIX>`, `<SUFFIX>` |
 
 ## Repository Structure
@@ -32,17 +32,19 @@ z1/
 │   └── setup_runpod.sh            # Automated provisioning script for cloud GPU instances
 ├── smoke_test.py                  # End-to-end CPU architecture and component verification script
 ├── tests/
-│   ├── test_data.py               # Unit tests for data filtering, deduplication, and sequence packing
-│   ├── test_model.py              # Unit tests for transformer blocks, RoPE, RMSNorm, SwiGLU, and generation
+│   ├── test_data.py               # Unit tests for filtering, quality heuristics, curriculum, and distillation
+│   ├── test_model.py              # Unit tests for transformer blocks, RoPE, RMSNorm, SwiGLU, and 250M/125M presets
 │   └── test_tokenizer.py          # Unit tests for Byte-Level BPE tokenizer and special tokens
 └── z1/
     ├── __init__.py                # Package root exporting core classes and version
-    ├── config.py                  # Z1Config dataclass defining model dimensions and hyperparameters
+    ├── config.py                  # Z1Config dataclass defining 250M defaults, 125M presets, and overtraining ratio
     ├── data/
-    │   ├── __init__.py            # Data package root exporting dataset and dataloader classes
-    │   ├── dataset.py             # PackedSequenceDataset and causal LM DataLoader
+    │   ├── __init__.py            # Data package root exporting datasets, loaders, filters, and curriculum
+    │   ├── curriculum.py          # Curriculum learning complexity scoring and sorting utilities
+    │   ├── dataset.py             # PackedSequenceDataset and causal LM DataLoader with curriculum support
+    │   ├── distill.py             # Teacher model synthetic distillation pipeline and dataset mixing
     │   ├── download.py            # Dataset download utility for StarCoderData and The Stack v2
-    │   ├── filter_code.py         # License, language, heuristic quality filter, and SHA256 deduplication
+    │   ├── filter_code.py         # License, language, textbook quality score heuristics, and SHA256 dedup
     │   └── pipeline.py            # End-to-end data processing CLI orchestrator
     ├── eval.py                    # Evaluation utility for perplexity, syntax checks, and reasoning tag balance
     ├── inference.py               # Interactive CLI and streaming text generation engine
@@ -52,7 +54,7 @@ z1/
     │   ├── __init__.py            # Tokenizer package root exporting Z1Tokenizer
     │   ├── train_tokenizer.py     # Byte-Level BPE tokenizer training script with special tokens
     │   └── z1_tokenizer.py        # Tokenizer runtime interface with reasoning and ChatML formatting
-    └── train.py                   # Autoregressive causal LM training loop with mixed precision and AdamW
+    └── train.py                   # Autoregressive causal LM training loop with overtraining and curriculum support
 ```
 
 ## Development Quickstart
