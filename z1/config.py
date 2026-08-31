@@ -38,6 +38,12 @@ class Z1Config:
     tool_call_end_id: int = 7
     tool_resp_start_id: int = 8
     tool_resp_end_id: int = 9
+    search_id: int = 17
+    replace_id: int = 18
+    diff_end_id: int = 19
+    uncertain_id: int = 20
+    db_call_start_id: int = 21
+    db_call_end_id: int = 22
 
     def __post_init__(self):
         if self.n_kv_heads is None:

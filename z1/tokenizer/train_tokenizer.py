@@ -28,6 +28,12 @@ Z1_SPECIAL_TOKENS = [
     "<FILL>",   # 14 - FIM middle
     "<PREFIX>", # 15 - FIM prefix
     "<SUFFIX>", # 16 - FIM suffix
+    "<search>", # 17 - Diff search block start
+    "<replace>",# 18 - Diff replace block start
+    "<diff_end>", # 19 - Diff block end
+    "<uncertain>", # 20 - Explicit uncertainty tag
+    "<db_call>",   # 21 - Structured DB call start
+    "</db_call>",  # 22 - Structured DB call end
 ]
 
 CODE_EXTENSIONS = [

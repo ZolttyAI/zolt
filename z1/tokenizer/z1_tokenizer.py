@@ -28,6 +28,12 @@ SPECIAL_TOKEN_MAP = {
     "fill": "<FILL>",
     "prefix": "<PREFIX>",
     "suffix": "<SUFFIX>",
+    "search": "<search>",
+    "replace": "<replace>",
+    "diff_end": "<diff_end>",
+    "uncertain": "<uncertain>",
+    "db_call_start": "<db_call>",
+    "db_call_end": "</db_call>",
 }
 
 

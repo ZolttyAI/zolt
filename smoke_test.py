@@ -124,8 +124,34 @@ def run_smoke_test():
     from z1.tokenizer.train_tokenizer import Z1_SPECIAL_TOKENS
     assert "<think>" in Z1_SPECIAL_TOKENS
     assert "<tool_call>" in Z1_SPECIAL_TOKENS
-    assert len(Z1_SPECIAL_TOKENS) == len(set(Z1_SPECIAL_TOKENS))
+    assert "<search>" in Z1_SPECIAL_TOKENS
+    assert "<replace>" in Z1_SPECIAL_TOKENS
+    assert "<diff_end>" in Z1_SPECIAL_TOKENS
+    assert "<uncertain>" in Z1_SPECIAL_TOKENS
+    assert "<db_call>" in Z1_SPECIAL_TOKENS
+    assert "</db_call>" in Z1_SPECIAL_TOKENS
+    assert len(Z1_SPECIAL_TOKENS) == 23
     print(f"✓ Special tokens OK | {len(Z1_SPECIAL_TOKENS)} tokens")
+
+    # Native diff format
+    from z1.inference.diff_format import apply_diff_edit, parse_diff_blocks
+    diff_sample = "<search>\nfoo = 1\n<replace>\nfoo = 2\n<diff_end>"
+    edits = parse_diff_blocks(diff_sample)
+    assert len(edits) == 1
+    assert apply_diff_edit("foo = 1\nbar = 2", edits[0].search, edits[0].replace) == "foo = 2\nbar = 2"
+    print("✓ Native diff format parser OK")
+
+    # TypeScript verification
+    from z1.inference.verify_ts import verify_typescript_code
+    assert verify_typescript_code("const x: number = 42;")["valid"]
+    assert not verify_typescript_code("const x = [1, 2;")["valid"]
+    print("✓ TypeScript self-verification OK")
+
+    # Structured DB call
+    from z1.inference.db_call import validate_db_call
+    assert validate_db_call({"dialect": "postgresql", "operation": "select", "table": "users", "constraints": {}})["valid"]
+    assert not validate_db_call({"dialect": "mongodb", "operation": "select", "table": "users", "constraints": {}})["valid"]
+    print("✓ Structured DB call schema validation OK")
 
     print()
     print("=" * 60)

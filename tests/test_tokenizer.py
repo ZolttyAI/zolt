@@ -14,9 +14,16 @@ def test_special_tokens_count():
     assert "</think>" in Z1_SPECIAL_TOKENS
     assert "<tool_call>" in Z1_SPECIAL_TOKENS
     assert "</tool_call>" in Z1_SPECIAL_TOKENS
+    assert "<search>" in Z1_SPECIAL_TOKENS
+    assert "<replace>" in Z1_SPECIAL_TOKENS
+    assert "<diff_end>" in Z1_SPECIAL_TOKENS
+    assert "<uncertain>" in Z1_SPECIAL_TOKENS
+    assert "<db_call>" in Z1_SPECIAL_TOKENS
+    assert "</db_call>" in Z1_SPECIAL_TOKENS
     assert "<bos>" in Z1_SPECIAL_TOKENS
     assert "<eos>" in Z1_SPECIAL_TOKENS
     assert "<pad>" in Z1_SPECIAL_TOKENS
+    assert len(Z1_SPECIAL_TOKENS) == 23
 
 
 def test_special_token_ordering():
