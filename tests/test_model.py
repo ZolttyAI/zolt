@@ -160,3 +160,21 @@ def test_matformer_slice_250m():
     assert logits.shape == (2, 8, cfg.vocab_size)
     assert loss is not None
 
+
+def test_encode_default_is_last(tiny_config):
+    model = Z1ForCausalLM(tiny_config)
+    model.eval()
+    input_ids = torch.tensor([[1, 10, 20, 30]])
+    enc_default = model.encode(input_ids)
+    enc_last = model.encode(input_ids, pool="last")
+    assert torch.allclose(enc_default, enc_last), "Default encode() must produce pool='last' output"
+
+
+def test_encode_mean_vs_last_distinct(tiny_config):
+    model = Z1ForCausalLM(tiny_config)
+    model.eval()
+    input_ids = torch.tensor([[1, 10, 20, 30]])
+    enc_last = model.encode(input_ids, pool="last")
+    enc_mean = model.encode(input_ids, pool="mean")
+    assert not torch.allclose(enc_last, enc_mean), "pool='last' and pool='mean' must produce distinct representations"
+

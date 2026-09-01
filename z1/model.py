@@ -272,7 +272,7 @@ class Z1ForCausalLM(nn.Module):
         self,
         input_ids: torch.Tensor,
         active_dim: Optional[int] = None,
-        pool: str = "mean",
+        pool: str = "last",
     ) -> torch.Tensor:
         """
         Extract pooled hidden-state representations (no gradient).
@@ -281,7 +281,7 @@ class Z1ForCausalLM(nn.Module):
         Args:
             input_ids: (B, T) token id tensor.
             active_dim: Optional MatFormer slice dimension.
-            pool: 'mean' (mean over T) or 'last' (last non-pad token).
+            pool: 'last' (last token representation, default for causal LM) or 'mean' (mean over T).
 
         Returns:
             Tensor of shape (B, dim).

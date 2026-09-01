@@ -124,3 +124,24 @@ def test_save_load_roundtrip():
     assignments_after = km2.assign(emb)
     assert torch.equal(assignments_before, assignments_after)
     assert km2.n_clusters == 4
+
+
+def test_extract_embeddings_default_pool():
+    from z1.config import Z1Config
+    from z1.model import Z1ForCausalLM
+    from z1.probe.cluster import extract_embeddings
+
+    cfg = Z1Config(dim=64, n_layers=2, n_heads=2, hidden_dim=128, vocab_size=100, max_seq_len=32)
+    model = Z1ForCausalLM(cfg)
+    device = torch.device("cpu")
+    batches = [torch.tensor([[1, 5, 9, 12]]), torch.tensor([[2, 4, 6, 8]])]
+
+    # Default pool should be 'last'
+    emb_default = extract_embeddings(model, batches, device=device)
+    emb_last = extract_embeddings(model, batches, device=device, pool="last")
+    emb_mean = extract_embeddings(model, batches, device=device, pool="mean")
+
+    assert torch.allclose(emb_default, emb_last)
+    assert not torch.allclose(emb_default, emb_mean)
+    assert emb_default.shape == (2, 64)
+

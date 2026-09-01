@@ -180,10 +180,10 @@ def extract_embeddings(
     token_batches: List[torch.Tensor],
     device: torch.device,
     active_dim: Optional[int] = None,
-    pool: str = "mean",
+    pool: str = "last",
 ) -> torch.Tensor:
     """
-    Extract mean-pooled embeddings from Z1ForCausalLM via model.encode().
+    Extract last-token (or pooled) embeddings from Z1ForCausalLM via model.encode().
     The backbone is not modified (encode() runs under no_grad).
 
     Args:
@@ -191,7 +191,7 @@ def extract_embeddings(
         token_batches: List of (1, T) or (B, T) token id tensors.
         device:        Device to run on.
         active_dim:    Optional MatFormer slice dimension.
-        pool:          'mean' or 'last'.
+        pool:          'last' (default for causal LM) or 'mean'.
 
     Returns:
         Tensor of shape (n_samples, embedding_dim).

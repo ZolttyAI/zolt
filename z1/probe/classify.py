@@ -95,7 +95,7 @@ class MLPProbe(nn.Module):
 
 class ClassificationProbe:
     """
-    Trainable classification probe over z1 mean-pooled hidden states.
+    Trainable classification probe over z1 hidden-state representations.
 
     Label set is hybrid: a predefined set (DEFAULT_INTENT_LABELS or
     DEFAULT_LANG_LABELS) merged with any user-supplied custom labels.

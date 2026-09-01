@@ -60,7 +60,7 @@ class MLPRegressionHead(nn.Module):
 
 class RegressionProbe:
     """
-    Trainable regression probe over z1 mean-pooled embeddings.
+    Trainable regression probe over z1 hidden-state embeddings.
 
     target_name selects which supervised signal to train against:
       'quality_score' -- output of compute_textbook_quality_score()
