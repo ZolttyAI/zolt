@@ -40,6 +40,9 @@ jobs:
           uv pip install tokenizers datasets pytest einops tqdm --python .venv/bin/python
           uv pip install -e . --python .venv/bin/python
 
+      - name: Install TypeScript compiler
+        run: npm install --global typescript
+
       - name: Run smoke test
         run: |
           source .venv/bin/activate
