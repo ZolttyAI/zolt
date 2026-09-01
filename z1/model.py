@@ -268,6 +268,30 @@ class Z1ForCausalLM(nn.Module):
         return logits, loss
 
     @torch.no_grad()
+    def encode(
+        self,
+        input_ids: torch.Tensor,
+        active_dim: Optional[int] = None,
+        pool: str = "mean",
+    ) -> torch.Tensor:
+        """
+        Extract pooled hidden-state representations (no gradient).
+        Used by probe and memory modules; backbone weights are unchanged.
+
+        Args:
+            input_ids: (B, T) token id tensor.
+            active_dim: Optional MatFormer slice dimension.
+            pool: 'mean' (mean over T) or 'last' (last non-pad token).
+
+        Returns:
+            Tensor of shape (B, dim).
+        """
+        hidden = self.model(input_ids, active_dim=active_dim)  # (B, T, dim)
+        if pool == "last":
+            return hidden[:, -1, :]
+        return hidden.mean(dim=1)  # mean pooling over sequence length
+
+
     def generate(
         self,
         input_ids: torch.Tensor,
