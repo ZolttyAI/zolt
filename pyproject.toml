@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "z1"
+name = "zolt"
 version = "0.1.0"
-description = "z1 - 125M Coding-Agent and Reasoning AI (zone.ai)"
+description = "zolt - Coding-Agent and Reasoning AI (zolt.ai)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -16,8 +16,11 @@ dependencies = [
     "tqdm>=4.65.0",
 ]
 
+[project.scripts]
+zolt = "zolt.inference:main"
+
 [tool.setuptools.packages.find]
-include = ["z1*"]
+include = ["zolt*"]
 
 [project.optional-dependencies]
 dev = [

@@ -1,13 +1,13 @@
 """Unit tests for adaptive MatFormer routing and explicit uncertainty tagging."""
 import torch
 import pytest
-from z1.config import Z1Config
-from z1.model import Z1ForCausalLM
-from z1.inference.generator import (
+from zolt.config import ZoltConfig
+from zolt.model import ZoltForCausalLM
+from zolt.inference.generator import (
     classify_prompt_complexity,
     compute_token_entropy,
     is_factual_claim_token,
-    Z1Generator,
+    ZoltGenerator,
 )
 
 
@@ -96,11 +96,11 @@ class MockModel(torch.nn.Module):
 
 
 def test_generator_uncertainty_tag_fires_above_threshold():
-    cfg = Z1Config(vocab_size=100, max_seq_len=64, eos_token_id=4)
+    cfg = ZoltConfig(vocab_size=100, max_seq_len=64, eos_token_id=4)
     model = MockModel(high_uncertainty=True)
     tokenizer = MockTokenizer()
 
-    generator = Z1Generator(
+    generator = ZoltGenerator(
         model=model,
         config=cfg,
         tokenizer=tokenizer,
@@ -115,11 +115,11 @@ def test_generator_uncertainty_tag_fires_above_threshold():
 
 
 def test_generator_uncertainty_tag_does_not_fire_below_threshold():
-    cfg = Z1Config(vocab_size=100, max_seq_len=64, eos_token_id=4)
+    cfg = ZoltConfig(vocab_size=100, max_seq_len=64, eos_token_id=4)
     model = MockModel(high_uncertainty=False)
     tokenizer = MockTokenizer()
 
-    generator = Z1Generator(
+    generator = ZoltGenerator(
         model=model,
         config=cfg,
         tokenizer=tokenizer,

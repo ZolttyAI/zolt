@@ -1,37 +1,37 @@
-"""Unit tests for z1 tokenizer."""
+"""Unit tests for zolt tokenizer."""
 import os
 import tempfile
 
 import pytest
 
-from z1.tokenizer.train_tokenizer import Z1_SPECIAL_TOKENS, get_code_iterator
+from zolt.tokenizer.train_tokenizer import ZOLT_SPECIAL_TOKENS, get_code_iterator
 
 
 def test_special_tokens_count():
     """Verify that special tokens are uniquely defined."""
-    assert len(Z1_SPECIAL_TOKENS) == len(set(Z1_SPECIAL_TOKENS)), "Duplicate special tokens detected"
-    assert "<think>" in Z1_SPECIAL_TOKENS
-    assert "</think>" in Z1_SPECIAL_TOKENS
-    assert "<tool_call>" in Z1_SPECIAL_TOKENS
-    assert "</tool_call>" in Z1_SPECIAL_TOKENS
-    assert "<search>" in Z1_SPECIAL_TOKENS
-    assert "<replace>" in Z1_SPECIAL_TOKENS
-    assert "<diff_end>" in Z1_SPECIAL_TOKENS
-    assert "<uncertain>" in Z1_SPECIAL_TOKENS
-    assert "<db_call>" in Z1_SPECIAL_TOKENS
-    assert "</db_call>" in Z1_SPECIAL_TOKENS
-    assert "<bos>" in Z1_SPECIAL_TOKENS
-    assert "<eos>" in Z1_SPECIAL_TOKENS
-    assert "<pad>" in Z1_SPECIAL_TOKENS
-    assert len(Z1_SPECIAL_TOKENS) == 23
+    assert len(ZOLT_SPECIAL_TOKENS) == len(set(ZOLT_SPECIAL_TOKENS)), "Duplicate special tokens detected"
+    assert "<think>" in ZOLT_SPECIAL_TOKENS
+    assert "</think>" in ZOLT_SPECIAL_TOKENS
+    assert "<tool_call>" in ZOLT_SPECIAL_TOKENS
+    assert "</tool_call>" in ZOLT_SPECIAL_TOKENS
+    assert "<search>" in ZOLT_SPECIAL_TOKENS
+    assert "<replace>" in ZOLT_SPECIAL_TOKENS
+    assert "<diff_end>" in ZOLT_SPECIAL_TOKENS
+    assert "<uncertain>" in ZOLT_SPECIAL_TOKENS
+    assert "<db_call>" in ZOLT_SPECIAL_TOKENS
+    assert "</db_call>" in ZOLT_SPECIAL_TOKENS
+    assert "<bos>" in ZOLT_SPECIAL_TOKENS
+    assert "<eos>" in ZOLT_SPECIAL_TOKENS
+    assert "<pad>" in ZOLT_SPECIAL_TOKENS
+    assert len(ZOLT_SPECIAL_TOKENS) == 23
 
 
 def test_special_token_ordering():
     """Verify that pad=0, bos=1, eos=2, unk=3 token ordering matches configuration."""
-    assert Z1_SPECIAL_TOKENS[0] == "<pad>"
-    assert Z1_SPECIAL_TOKENS[1] == "<bos>"
-    assert Z1_SPECIAL_TOKENS[2] == "<eos>"
-    assert Z1_SPECIAL_TOKENS[3] == "<unk>"
+    assert ZOLT_SPECIAL_TOKENS[0] == "<pad>"
+    assert ZOLT_SPECIAL_TOKENS[1] == "<bos>"
+    assert ZOLT_SPECIAL_TOKENS[2] == "<eos>"
+    assert ZOLT_SPECIAL_TOKENS[3] == "<unk>"
 
 
 def test_code_iterator_finds_files():
@@ -40,7 +40,7 @@ def test_code_iterator_finds_files():
         # Create synthetic files for testing
         for name, content in [
             ("main.py", "def hello():\n    print('hello') * 5\n" * 20),
-            ("app.js", "const x = () => console.log('z1') * 5\n" * 20),
+            ("app.js", "const x = () => console.log('zolt') * 5\n" * 20),
             ("README.txt", "this file should be ignored"),
         ]:
             with open(os.path.join(tmpdir, name), "w") as f:

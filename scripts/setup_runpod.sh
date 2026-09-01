@@ -1,13 +1,13 @@
 #!/bin/bash
 # ============================================================
-# z1 zone.ai — Setup Script para RunPod / Vast.ai
+# zolt zolt.ai — Setup Script para RunPod / Vast.ai
 # Colar no terminal do pod após arranque
 # ============================================================
 
 set -e
 
 echo "============================================================"
-echo "z1 zone.ai — RunPod Setup"
+echo "zolt zolt.ai — RunPod Setup"
 echo "============================================================"
 
 # ─── 1. Verificar GPU ────────────────────────────────────────
@@ -25,17 +25,17 @@ if ! command -v uv &> /dev/null; then
 fi
 echo "uv: $(uv --version)"
 
-# ─── 3. Clonar repositório z1 ────────────────────────────────
+# ─── 3. Clonar repositório zolt ──────────────────────────────
 echo ""
-echo "[3/6] Clonar z1..."
+echo "[3/6] Clonar zolt..."
 # Substituir pelo URL real do repositório
-# git clone https://github.com/SEU_USER/z1.git /workspace/z1
-# cd /workspace/z1
+# git clone https://github.com/SEU_USER/zolt.git /workspace/zolt
+# cd /workspace/zolt
 
 # Se já tens o código comprimido:
-# tar -xzf z1.tar.gz -C /workspace/
+# tar -xzf zolt.tar.gz -C /workspace/
 
-cd /workspace/z1 2>/dev/null || { echo "Ajusta o caminho do repositório z1"; exit 1; }
+cd /workspace/zolt 2>/dev/null || { echo "Ajusta o caminho do repositório zolt"; exit 1; }
 
 # ─── 4. Criar venv e instalar dependências ───────────────────
 echo ""
@@ -71,7 +71,7 @@ echo ""
 echo "  # 2. Pipeline de dados completo"
 echo "  make pipeline"
 echo ""
-echo "  # 3. Treinar z1 125M"
+echo "  # 3. Treinar zolt 250M"
 echo "  make train"
 echo ""
 echo "  # Ou passo-a-passo:"

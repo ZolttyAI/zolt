@@ -4,11 +4,11 @@ retry loop success/exhausted, and tool-absent fallback (verified=False).
 """
 import unittest.mock as mock
 import pytest
-from z1.inference.verify_js import (
+from zolt.inference.verify_js import (
     verify_javascript_code,
     self_correcting_generate_js,
 )
-from z1.inference.verify_base import extract_code_block
+from zolt.inference.verify_base import extract_code_block
 
 
 class MockGenerator:
@@ -57,7 +57,7 @@ def test_verified_false_when_node_absent():
     for a heuristic result.
     """
     valid_js = "const add = (a, b) => a + b;"
-    with mock.patch("z1.inference.verify_js.shutil.which", return_value=None):
+    with mock.patch("zolt.inference.verify_js.shutil.which", return_value=None):
         res = verify_javascript_code(valid_js)
 
     assert res["valid"]
@@ -69,7 +69,7 @@ def test_verified_false_when_node_absent():
 def test_invalid_syntax_detected_without_node():
     """Heuristic catches bracket errors even without node."""
     broken = "function f( { return 1;;"
-    with mock.patch("z1.inference.verify_js.shutil.which", return_value=None):
+    with mock.patch("zolt.inference.verify_js.shutil.which", return_value=None):
         res = verify_javascript_code(broken)
     assert not res["valid"]
 

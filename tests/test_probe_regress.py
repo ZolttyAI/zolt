@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from z1.probe.regress import (
+from zolt.probe.regress import (
     RegressionProbe,
     build_regression_suite,
     REGRESSION_TARGETS,

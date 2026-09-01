@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import torch
 
-from z1.probe.classify import (
+from zolt.probe.classify import (
     ClassificationProbe,
     DEFAULT_INTENT_LABELS,
     DEFAULT_LANG_LABELS,

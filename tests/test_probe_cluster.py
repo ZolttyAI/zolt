@@ -6,7 +6,7 @@ import pytest
 import torch
 import numpy as np
 
-from z1.probe.cluster import KMeansCluster
+from zolt.probe.cluster import KMeansCluster
 
 
 DIM = 32
@@ -127,12 +127,12 @@ def test_save_load_roundtrip():
 
 
 def test_extract_embeddings_default_pool():
-    from z1.config import Z1Config
-    from z1.model import Z1ForCausalLM
-    from z1.probe.cluster import extract_embeddings
+    from zolt.config import ZoltConfig
+    from zolt.model import ZoltForCausalLM
+    from zolt.probe.cluster import extract_embeddings
 
-    cfg = Z1Config(dim=64, n_layers=2, n_heads=2, hidden_dim=128, vocab_size=100, max_seq_len=32)
-    model = Z1ForCausalLM(cfg)
+    cfg = ZoltConfig(dim=64, n_layers=2, n_heads=2, hidden_dim=128, vocab_size=100, max_seq_len=32)
+    model = ZoltForCausalLM(cfg)
     device = torch.device("cpu")
     batches = [torch.tensor([[1, 5, 9, 12]]), torch.tensor([[2, 4, 6, 8]])]
 

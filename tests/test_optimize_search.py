@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from z1.optimize.search import (
+from zolt.optimize.search import (
     Trial,
     SearchResult,
     grid_search,

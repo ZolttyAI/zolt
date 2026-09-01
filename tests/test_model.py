@@ -1,10 +1,10 @@
-"""Unit tests for z1 model architecture."""
+"""Unit tests for zolt model architecture."""
 import pytest
 import torch
-from z1.config import Z1Config
-from z1.model import (
-    Z1ForCausalLM,
-    Z1Transformer,
+from zolt.config import ZoltConfig
+from zolt.model import (
+    ZoltForCausalLM,
+    ZoltTransformer,
     RMSNorm,
     SwiGLUFFN,
     Attention,
@@ -16,7 +16,7 @@ from z1.model import (
 @pytest.fixture
 def tiny_config():
     """Minimal config for fast CPU execution."""
-    return Z1Config(
+    return ZoltConfig(
         vocab_size=256,
         dim=64,
         n_layers=2,
@@ -83,15 +83,15 @@ def test_swiglu_ffn_matformer_slice(tiny_config):
     assert out[..., 32:].abs().sum() == 0
 
 
-def test_z1transformer_forward(tiny_config):
-    model = Z1Transformer(tiny_config)
+def test_zolttransformer_forward(tiny_config):
+    model = ZoltTransformer(tiny_config)
     input_ids = torch.randint(0, tiny_config.vocab_size, (2, 16))
     out = model(input_ids)
     assert out.shape == (2, 16, tiny_config.dim)
 
 
-def test_z1_causal_lm_loss(tiny_config):
-    model = Z1ForCausalLM(tiny_config)
+def test_zolt_causal_lm_loss(tiny_config):
+    model = ZoltForCausalLM(tiny_config)
     input_ids = torch.randint(0, tiny_config.vocab_size, (2, 16))
     labels = torch.randint(0, tiny_config.vocab_size, (2, 16))
     logits, loss = model(input_ids, labels=labels)
@@ -100,22 +100,22 @@ def test_z1_causal_lm_loss(tiny_config):
     assert loss.item() > 0
 
 
-def test_z1_no_loss_without_labels(tiny_config):
-    model = Z1ForCausalLM(tiny_config)
+def test_zolt_no_loss_without_labels(tiny_config):
+    model = ZoltForCausalLM(tiny_config)
     input_ids = torch.randint(0, tiny_config.vocab_size, (1, 8))
     logits, loss = model(input_ids)
     assert logits.shape == (1, 8, tiny_config.vocab_size)
     assert loss is None
 
 
-def test_z1_weight_tying(tiny_config):
-    model = Z1ForCausalLM(tiny_config)
+def test_zolt_weight_tying(tiny_config):
+    model = ZoltForCausalLM(tiny_config)
     assert model.lm_head.weight is model.model.tok_embeddings.weight, \
         "lm_head and tok_embeddings must share weights"
 
 
-def test_z1_generate(tiny_config):
-    model = Z1ForCausalLM(tiny_config)
+def test_zolt_generate(tiny_config):
+    model = ZoltForCausalLM(tiny_config)
     model.eval()
     input_ids = torch.tensor([[1, 10, 20]])  # [bos, tok, tok]
     out = model.generate(input_ids, max_new_tokens=5, temperature=1.0)
@@ -124,36 +124,36 @@ def test_z1_generate(tiny_config):
 
 
 def test_parameter_count(tiny_config):
-    model = Z1ForCausalLM(tiny_config)
+    model = ZoltForCausalLM(tiny_config)
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     assert n_params > 0
     print(f"\nParameters (tiny_config): {n_params:,}")
 
 
 def test_parameter_count_default_250m():
-    config = Z1Config()
-    model = Z1ForCausalLM(config)
+    config = ZoltConfig()
+    model = ZoltForCausalLM(config)
     n_params = sum(p.numel() for p in model.parameters())
     # Assert ~250M parameters range
     assert 240_000_000 <= n_params <= 260_000_000, f"Expected ~250M params, got {n_params:,}"
 
 
 def test_presets_parameter_counts():
-    cfg_125 = Z1Config.preset("125m")
-    m_125 = Z1ForCausalLM(cfg_125)
-    n_125 = sum(p.numel() for p in m_125.parameters())
-    assert 100_000_000 <= n_125 <= 130_000_000, f"Expected ~125M preset, got {n_125:,}"
+    cfg_mini = ZoltConfig.preset("zolt-mini")
+    m_mini = ZoltForCausalLM(cfg_mini)
+    n_mini = sum(p.numel() for p in m_mini.parameters())
+    assert 100_000_000 <= n_mini <= 130_000_000, f"Expected ~125M (zolt-mini) preset, got {n_mini:,}"
 
-    cfg_250 = Z1Config.preset("250m")
-    m_250 = Z1ForCausalLM(cfg_250)
-    n_250 = sum(p.numel() for p in m_250.parameters())
-    assert 240_000_000 <= n_250 <= 260_000_000, f"Expected ~250M preset, got {n_250:,}"
+    cfg_zolt = ZoltConfig.preset("zolt")
+    m_zolt = ZoltForCausalLM(cfg_zolt)
+    n_zolt = sum(p.numel() for p in m_zolt.parameters())
+    assert 240_000_000 <= n_zolt <= 260_000_000, f"Expected ~250M (zolt) preset, got {n_zolt:,}"
 
 
 def test_matformer_slice_250m():
-    cfg = Z1Config.preset("250m")
+    cfg = ZoltConfig.preset("zolt")
     cfg.n_layers = 2  # minimal layers for test speed
-    model = Z1ForCausalLM(cfg)
+    model = ZoltForCausalLM(cfg)
     input_ids = torch.randint(0, cfg.vocab_size, (2, 8))
     labels = torch.randint(0, cfg.vocab_size, (2, 8))
     logits, loss = model(input_ids, labels=labels, active_dim=512)
@@ -162,7 +162,7 @@ def test_matformer_slice_250m():
 
 
 def test_encode_default_is_last(tiny_config):
-    model = Z1ForCausalLM(tiny_config)
+    model = ZoltForCausalLM(tiny_config)
     model.eval()
     input_ids = torch.tensor([[1, 10, 20, 30]])
     enc_default = model.encode(input_ids)
@@ -171,10 +171,9 @@ def test_encode_default_is_last(tiny_config):
 
 
 def test_encode_mean_vs_last_distinct(tiny_config):
-    model = Z1ForCausalLM(tiny_config)
+    model = ZoltForCausalLM(tiny_config)
     model.eval()
     input_ids = torch.tensor([[1, 10, 20, 30]])
     enc_last = model.encode(input_ids, pool="last")
     enc_mean = model.encode(input_ids, pool="mean")
     assert not torch.allclose(enc_last, enc_mean), "pool='last' and pool='mean' must produce distinct representations"
-

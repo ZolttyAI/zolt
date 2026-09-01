@@ -4,11 +4,11 @@ retry loop success/exhausted, and checker distinctions (ast vs mypy).
 """
 import unittest.mock as mock
 import pytest
-from z1.inference.verify_python import (
+from zolt.inference.verify_python import (
     verify_python_code,
     self_correcting_generate_python,
 )
-from z1.inference.verify_base import extract_code_block
+from zolt.inference.verify_base import extract_code_block
 
 
 class MockGenerator:
@@ -57,7 +57,7 @@ def test_verify_python_result_shape():
 
 def test_verify_python_checker_is_ast():
     """Without mypy present, checker should be 'ast'."""
-    with mock.patch("z1.inference.verify_python.shutil.which", return_value=None):
+    with mock.patch("zolt.inference.verify_python.shutil.which", return_value=None):
         res = verify_python_code("x = 1 + 2")
     assert res["checker"] == "ast"
     assert res["verified"] is True
@@ -70,8 +70,8 @@ def test_verify_python_mypy_failure_propagated():
     def mock_which(name):
         return fake_mypy if name == "mypy" else None
 
-    with mock.patch("z1.inference.verify_python.shutil.which", side_effect=mock_which):
-        with mock.patch("z1.inference.verify_python.subprocess.run") as mock_run:
+    with mock.patch("zolt.inference.verify_python.shutil.which", side_effect=mock_which):
+        with mock.patch("zolt.inference.verify_python.subprocess.run") as mock_run:
             mock_run.return_value = mock.Mock(
                 returncode=1,
                 stdout="error: Incompatible types\n",

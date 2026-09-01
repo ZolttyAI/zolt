@@ -1,18 +1,18 @@
-"""Unit tests for z1 data pipeline."""
+"""Unit tests for zolt data pipeline."""
 import json
 import os
 import tempfile
 
 import pytest
 
-from z1.data.filter_code import (
+from zolt.data.filter_code import (
     is_permissive_license,
     is_target_language,
     passes_quality_heuristics,
     content_hash,
     filter_jsonl_file,
 )
-from z1.data.dataset import PackedSequenceDataset
+from zolt.data.dataset import PackedSequenceDataset
 
 
 # --- filter_code Tests ---
@@ -96,19 +96,19 @@ def test_filter_jsonl_file():
 
 # --- Textbook Quality Score Heuristic Tests ---
 
-from z1.data.filter_code import (
+from zolt.data.filter_code import (
     score_comments_and_docstrings,
     score_test_presence,
     score_anti_patterns,
     score_complexity_readability,
     compute_textbook_quality_score,
 )
-from z1.data.curriculum import (
+from zolt.data.curriculum import (
     estimate_code_complexity,
     estimate_token_sequence_complexity,
     sort_by_curriculum,
 )
-from z1.data.distill import generate_synthetic_instance, mix_datasets
+from zolt.data.distill import generate_synthetic_instance, mix_datasets
 
 
 def test_score_comments_and_docstrings():
@@ -319,4 +319,3 @@ def test_packed_dataset_basic():
         assert batch["labels"].shape[0] == 128
 
     os.unlink(bin_path)
-

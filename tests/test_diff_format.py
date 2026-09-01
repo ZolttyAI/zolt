@@ -1,6 +1,6 @@
 """Unit tests for native diff format parser and applicator."""
 import pytest
-from z1.inference.diff_format import (
+from zolt.inference.diff_format import (
     parse_diff_blocks,
     apply_diff_edit,
     apply_diff_block,
@@ -113,11 +113,11 @@ def test_apply_diff_block_full():
 
 def test_verified_true_not_emitted_from_heuristic_typescript():
     """TS: verified=True only from tsc, never from heuristic fallback."""
-    from z1.inference.verify_ts import verify_typescript_code
+    from zolt.inference.verify_ts import verify_typescript_code
     import unittest.mock as mock
 
     valid_ts = "const x: string = 'hello';"
-    with mock.patch("z1.inference.verify_ts.shutil.which", return_value=None):
+    with mock.patch("zolt.inference.verify_ts.shutil.which", return_value=None):
         res = verify_typescript_code(valid_ts)
 
     if res["valid"]:
@@ -127,11 +127,11 @@ def test_verified_true_not_emitted_from_heuristic_typescript():
 
 def test_verified_true_not_emitted_from_heuristic_javascript():
     """JS: verified=True only from node/eslint, never from heuristic fallback."""
-    from z1.inference.verify_js import verify_javascript_code
+    from zolt.inference.verify_js import verify_javascript_code
     import unittest.mock as mock
 
     valid_js = "const add = (a, b) => a + b;"
-    with mock.patch("z1.inference.verify_js.shutil.which", return_value=None):
+    with mock.patch("zolt.inference.verify_js.shutil.which", return_value=None):
         res = verify_javascript_code(valid_js)
 
     if res["valid"]:
@@ -141,8 +141,7 @@ def test_verified_true_not_emitted_from_heuristic_javascript():
 
 def test_python_verified_always_true():
     """Python: verified=True always, because ast.parse always runs."""
-    from z1.inference.verify_python import verify_python_code
+    from zolt.inference.verify_python import verify_python_code
     res = verify_python_code("x = 1 + 2")
     assert res["verified"] is True
     assert res["heuristic"] is False
-

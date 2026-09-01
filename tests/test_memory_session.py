@@ -6,7 +6,7 @@ import pytest
 import torch
 import numpy as np
 
-from z1.memory.session import SessionMemory
+from zolt.memory.session import SessionMemory
 
 
 DIM = 64

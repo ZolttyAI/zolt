@@ -32,34 +32,34 @@ smoke: ## Smoke test rápido (valida arquitetura sem dados reais)
 
 .PHONY: download-data
 download-data: ## Descarregar StarCoderData (fonte principal, sem gating)
-	HF_TOKEN=$(HF_TOKEN) $(PYTHON) -m z1.data.download \
+	HF_TOKEN=$(HF_TOKEN) $(PYTHON) -m zolt.data.download \
 		--source starcoder \
 		--output_dir data/raw \
 		--max_samples 300000
 
 .PHONY: filter-data
 filter-data: ## Filtrar dados crus (lang + licença + qualidade + dedup)
-	$(PYTHON) -m z1.data.pipeline filter \
+	$(PYTHON) -m zolt.data.pipeline filter \
 		--raw_dir data/raw \
 		--filtered_dir data/filtered
 
 .PHONY: train-tokenizer
 train-tokenizer: ## Treinar tokenizer BPE 32K sobre dados filtrados
-	$(PYTHON) -m z1.tokenizer.train_tokenizer \
+	$(PYTHON) -m zolt.tokenizer.train_tokenizer \
 		--data_dirs data/filtered \
-		--output z1_tokenizer.json \
+		--output zolt_tokenizer.json \
 		--vocab_size 32000
 
 .PHONY: tokenize-data
 tokenize-data: ## Tokenizar dados filtrados → ficheiros .bin
-	$(PYTHON) -m z1.data.pipeline tokenize \
+	$(PYTHON) -m zolt.data.pipeline tokenize \
 		--filtered_dir data/filtered \
-		--tokenizer z1_tokenizer.json \
+		--tokenizer zolt_tokenizer.json \
 		--tokens_dir data/tokens
 
 .PHONY: validate-data
 validate-data: ## Validar contagem de tokens (alvo: ≥3B)
-	$(PYTHON) -m z1.data.pipeline validate \
+	$(PYTHON) -m zolt.data.pipeline validate \
 		--tokens_dir data/tokens
 
 .PHONY: pipeline
@@ -68,8 +68,8 @@ pipeline: filter-data train-tokenizer tokenize-data validate-data ## Pipeline co
 # ─── Treino ─────────────────────────────────────────────────────────────────
 
 .PHONY: train
-train: ## Treinar z1 125M (requer GPU — usar no RunPod/Colab)
-	$(PYTHON) -m z1.train \
+train: ## Treinar zolt 250M (requer GPU — usar no RunPod/Colab)
+	$(PYTHON) -m zolt.train \
 		--token_files $$(ls data/tokens/*.bin | tr '\n' ' ') \
 		--output_dir checkpoints/ \
 		--max_seq_len 4096 \
@@ -83,7 +83,7 @@ train: ## Treinar z1 125M (requer GPU — usar no RunPod/Colab)
 
 .PHONY: train-debug
 train-debug: ## Treino mínimo local em CPU (smoke test do loop)
-	$(PYTHON) -m z1.train \
+	$(PYTHON) -m zolt.train \
 		--token_files data/tokens/debug.bin \
 		--output_dir checkpoints/debug/ \
 		--max_seq_len 512 \
@@ -98,9 +98,9 @@ train-debug: ## Treino mínimo local em CPU (smoke test do loop)
 
 .PHONY: extend-context
 extend-context: ## Estender contexto 4K → 16K via NTK RoPE scaling
-	$(PYTHON) -m z1.rope_scaling \
+	$(PYTHON) -m zolt.rope_scaling \
 		--checkpoint $(CKPT) \
-		--output checkpoints/z1-16k \
+		--output checkpoints/zolt-16k \
 		--target_len 16384 \
 		--method ntk
 
@@ -108,15 +108,15 @@ extend-context: ## Estender contexto 4K → 16K via NTK RoPE scaling
 
 .PHONY: eval
 eval: ## Avaliar checkpoint (perplexidade + syntax check)
-	$(PYTHON) -m z1.eval \
+	$(PYTHON) -m zolt.eval \
 		--checkpoint $(CKPT) \
 		--eval_jsonl data/eval.jsonl
 
 # ─── Utils ──────────────────────────────────────────────────────────────────
 
 .PHONY: count-params
-count-params: ## Contar parâmetros do modelo 125M
-	$(PYTHON) -c "from z1 import Z1Config, Z1ForCausalLM; m=Z1ForCausalLM(Z1Config()); n=sum(p.numel() for p in m.parameters()); print(f'z1 params: {n:,} ({n/1e6:.1f}M)')"
+count-params: ## Contar parâmetros do modelo zolt
+	$(PYTHON) -c "from zolt import ZoltConfig, ZoltForCausalLM; m=ZoltForCausalLM(ZoltConfig()); n=sum(p.numel() for p in m.parameters()); print(f'zolt params: {n:,} ({n/1e6:.1f}M)')"
 
 .PHONY: clean
 clean: ## Limpar caches e ficheiros temporários
@@ -127,7 +127,7 @@ clean: ## Limpar caches e ficheiros temporários
 .PHONY: help
 help: ## Mostrar ajuda
 	@echo ""
-	@echo "z1 — zone.ai | Makefile"
+	@echo "zolt — zolt.ai | Makefile"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'

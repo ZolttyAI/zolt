@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-z1 smoke test: CPU validation of model architecture, RoPE scaling, and components.
+zolt smoke test: CPU validation of model architecture, RoPE scaling, and components.
 """
 import sys
 
 def run_smoke_test():
     print("=" * 60)
-    print("z1 zone.ai - Smoke Test")
+    print("zolt (zolt.ai) - Smoke Test")
     print("=" * 60)
 
     try:
@@ -16,11 +16,11 @@ def run_smoke_test():
         print("✗ PyTorch not installed. Run: uv pip install torch --index-url https://download.pytorch.org/whl/cpu")
         sys.exit(1)
 
-    from z1.config import Z1Config
-    from z1.model import Z1ForCausalLM
+    from zolt.config import ZoltConfig
+    from zolt.model import ZoltForCausalLM
 
     # Minimal config for fast CPU execution
-    config = Z1Config(
+    config = ZoltConfig(
         vocab_size=256,
         dim=64,
         n_layers=2,
@@ -29,27 +29,27 @@ def run_smoke_test():
         hidden_dim=128,
         max_seq_len=128,
     )
-    print(f"✓ Z1Config loaded")
+    print(f"✓ ZoltConfig loaded")
 
-    model = Z1ForCausalLM(config)
+    model = ZoltForCausalLM(config)
     n_params = sum(p.numel() for p in model.parameters())
-    print(f"✓ Z1ForCausalLM instantiated | params: {n_params:,} ({n_params/1e6:.3f}M) [tiny config]")
+    print(f"✓ ZoltForCausalLM instantiated | params: {n_params:,} ({n_params/1e6:.3f}M) [tiny config]")
 
     # Parameter counts for presets and default 250M architecture
-    real_config_250 = Z1Config()
-    real_model_250 = Z1ForCausalLM(real_config_250)
+    real_config_250 = ZoltConfig()
+    real_model_250 = ZoltForCausalLM(real_config_250)
     real_params_250 = sum(p.numel() for p in real_model_250.parameters())
-    print(f"✓ Target 250M default config | params: {real_params_250:,} ({real_params_250/1e6:.1f}M)")
+    print(f"✓ Target 250M default config (zolt) | params: {real_params_250:,} ({real_params_250/1e6:.1f}M)")
 
-    preset_125 = Z1Config.preset("125m")
-    model_125 = Z1ForCausalLM(preset_125)
-    params_125 = sum(p.numel() for p in model_125.parameters())
-    print(f"✓ Preset 125M config        | params: {params_125:,} ({params_125/1e6:.1f}M)")
+    preset_mini = ZoltConfig.preset("zolt-mini")
+    model_mini = ZoltForCausalLM(preset_mini)
+    params_mini = sum(p.numel() for p in model_mini.parameters())
+    print(f"✓ Preset zolt-mini config            | params: {params_mini:,} ({params_mini/1e6:.1f}M)")
 
-    preset_250 = Z1Config.preset("250m")
-    model_250 = Z1ForCausalLM(preset_250)
-    params_250 = sum(p.numel() for p in model_250.parameters())
-    print(f"✓ Preset 250M config        | params: {params_250:,} ({params_250/1e6:.1f}M)")
+    preset_zolt = ZoltConfig.preset("zolt")
+    model_zolt = ZoltForCausalLM(preset_zolt)
+    params_zolt = sum(p.numel() for p in model_zolt.parameters())
+    print(f"✓ Preset zolt config                 | params: {params_zolt:,} ({params_zolt/1e6:.1f}M)")
 
     # Forward pass
     input_ids = torch.randint(0, config.vocab_size, (2, 16))
@@ -68,7 +68,7 @@ def run_smoke_test():
     print(f"✓ Generate OK | generated tokens: {out.shape[1] - seed.shape[1]}")
 
     # Rotary Position Embedding scaling
-    from z1.model import precompute_freqs_cis
+    from zolt.model import precompute_freqs_cis
     head_dim = config.dim // config.n_heads
     cos_linear, sin_linear = precompute_freqs_cis(head_dim, 512, scaling_type="linear", scaling_factor=4.0)
     cos_ntk, sin_ntk = precompute_freqs_cis(head_dim, 512, scaling_type="ntk", scaling_factor=4.0)
@@ -76,7 +76,7 @@ def run_smoke_test():
     print(f"✓ RoPE NTK scaling OK    | cos shape: {cos_ntk.shape}")
 
     # Evaluation utilities
-    from z1.eval import check_python_syntax, check_javascript_syntax_heuristic, check_reasoning_tags
+    from zolt.eval import check_python_syntax, check_javascript_syntax_heuristic, check_reasoning_tags
     py_ok = check_python_syntax("def foo():\n    return 42")
     py_bad = check_python_syntax("def foo(\n    return 42")
     js_ok = check_javascript_syntax_heuristic("const f = () => { return [1, 2]; };")
@@ -90,7 +90,7 @@ def run_smoke_test():
     print(f"✓ Eval helpers OK (syntax + reasoning tags)")
 
     # Data filtering and textbook quality score helpers
-    from z1.data.filter_code import (
+    from zolt.data.filter_code import (
         is_permissive_license,
         is_target_language,
         passes_quality_heuristics,
@@ -105,7 +105,7 @@ def run_smoke_test():
     print(f"✓ Data quality scoring OK | sample score: {q_score:.3f}")
 
     # Curriculum learning and complexity proxy
-    from z1.data.curriculum import estimate_code_complexity, estimate_token_sequence_complexity, sort_by_curriculum
+    from zolt.data.curriculum import estimate_code_complexity, estimate_token_sequence_complexity, sort_by_curriculum
     c_easy = estimate_code_complexity("def a(): return 1")
     c_hard = estimate_code_complexity("class Engine:\n    def run(self):\n        for i in range(10):\n            if i % 2 == 0:\n                try:\n                    pass\n                except Exception:\n                    pass")
     assert c_easy < c_hard
@@ -114,27 +114,27 @@ def run_smoke_test():
     print(f"✓ Curriculum staging OK | easy: {c_easy:.1f}, hard: {c_hard:.1f}")
 
     # Teacher distillation synthetic generation
-    from z1.data.distill import generate_synthetic_instance, mix_datasets
+    from zolt.data.distill import generate_synthetic_instance, mix_datasets
     synth = generate_synthetic_instance(None, {"lang": "python", "topic": "sorting"}, mock_mode=True)
     assert "<think>" in synth["content"]
     assert synth["license"] == "synthetic"
     print(f"✓ Teacher distillation pipeline OK")
 
     # Tokenizer special tokens
-    from z1.tokenizer.train_tokenizer import Z1_SPECIAL_TOKENS
-    assert "<think>" in Z1_SPECIAL_TOKENS
-    assert "<tool_call>" in Z1_SPECIAL_TOKENS
-    assert "<search>" in Z1_SPECIAL_TOKENS
-    assert "<replace>" in Z1_SPECIAL_TOKENS
-    assert "<diff_end>" in Z1_SPECIAL_TOKENS
-    assert "<uncertain>" in Z1_SPECIAL_TOKENS
-    assert "<db_call>" in Z1_SPECIAL_TOKENS
-    assert "</db_call>" in Z1_SPECIAL_TOKENS
-    assert len(Z1_SPECIAL_TOKENS) == 23
-    print(f"✓ Special tokens OK | {len(Z1_SPECIAL_TOKENS)} tokens")
+    from zolt.tokenizer.train_tokenizer import ZOLT_SPECIAL_TOKENS
+    assert "<think>" in ZOLT_SPECIAL_TOKENS
+    assert "<tool_call>" in ZOLT_SPECIAL_TOKENS
+    assert "<search>" in ZOLT_SPECIAL_TOKENS
+    assert "<replace>" in ZOLT_SPECIAL_TOKENS
+    assert "<diff_end>" in ZOLT_SPECIAL_TOKENS
+    assert "<uncertain>" in ZOLT_SPECIAL_TOKENS
+    assert "<db_call>" in ZOLT_SPECIAL_TOKENS
+    assert "</db_call>" in ZOLT_SPECIAL_TOKENS
+    assert len(ZOLT_SPECIAL_TOKENS) == 23
+    print(f"✓ Special tokens OK | {len(ZOLT_SPECIAL_TOKENS)} tokens")
 
     # Native diff format
-    from z1.inference.diff_format import apply_diff_edit, parse_diff_blocks
+    from zolt.inference.diff_format import apply_diff_edit, parse_diff_blocks
     diff_sample = "<search>\nfoo = 1\n<replace>\nfoo = 2\n<diff_end>"
     edits = parse_diff_blocks(diff_sample)
     assert len(edits) == 1
@@ -142,20 +142,20 @@ def run_smoke_test():
     print("✓ Native diff format parser OK")
 
     # TypeScript verification
-    from z1.inference.verify_ts import verify_typescript_code
+    from zolt.inference.verify_ts import verify_typescript_code
     assert verify_typescript_code("const x: number = 42;")["valid"]
     assert not verify_typescript_code("const x = [1, 2;")["valid"]
     print("✓ TypeScript self-verification OK")
 
     # Structured DB call
-    from z1.inference.db_call import validate_db_call
+    from zolt.inference.db_call import validate_db_call
     assert validate_db_call({"dialect": "postgresql", "operation": "select", "table": "users", "constraints": {}})["valid"]
     assert not validate_db_call({"dialect": "mongodb", "operation": "select", "table": "users", "constraints": {}})["valid"]
     print("✓ Structured DB call schema validation OK")
 
     print()
     print("=" * 60)
-    print("✓ All smoke tests passed. z1 is ready.")
+    print("✓ All smoke tests passed. zolt is ready.")
     print("=" * 60)
 
 
