@@ -224,3 +224,7 @@ STACK DE FOCO
 --------------------------------------------------------------------------------
 - Linguagens: JavaScript, TypeScript, Python, Vue, TSX, JSX, CSS, SCSS, HTML, Markdown, JSON, YAML
 - Frameworks e Bibliotecas: React.js, Next.js, Vue.js, NestJS, Tailwind CSS
+
+LICENSE
+
+- Apache-2.0 License

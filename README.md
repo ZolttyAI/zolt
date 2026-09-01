@@ -222,3 +222,7 @@ python -m zolt.inference \
 
 - Languages: JavaScript, TypeScript, Python, Vue, TSX, JSX, CSS, SCSS, HTML, Markdown, JSON, YAML
 - Frameworks and Libraries: React.js, Next.js, Vue.js, NestJS, Tailwind CSS
+
+## License
+
+- Apache-2.0 License
