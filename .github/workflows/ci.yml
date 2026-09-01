@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: CI
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13", "3.14"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+
+      - name: Create virtual environment
+        run: uv venv .venv
+
+      - name: Install project dependencies
+        run: |
+          source .venv/bin/activate
+          uv pip install torch --index-url https://download.pytorch.org/whl/cpu --python .venv/bin/python
+          uv pip install tokenizers datasets pytest einops tqdm --python .venv/bin/python
+          uv pip install -e . --python .venv/bin/python
+
+      - name: Run smoke test
+        run: |
+          source .venv/bin/activate
+          python smoke_test.py
+
+      - name: Run pytest
+        run: |
+          source .venv/bin/activate
+          pytest tests/ -v
