@@ -1,4 +1,4 @@
-# zolt
+# ZolttyAI
 
 Causal language model for code generation and reasoning (250.9M default parameters with `zolt-mini` sub-network slice, 4096 base context extendable to 16384 tokens).
 
@@ -21,10 +21,9 @@ Causal language model for code generation and reasoning (250.9M default paramete
 zolt/
 ├── Makefile                       # Automation targets for setup, testing, data pipeline, and training
 ├── README.md                      # Repository documentation in English
-├── README.txt                     # Repository documentation in Mozambican Portuguese (plain text)
+├── README.txt                     # Repository documentation in Portuguese (plain text)
 ├── notebooks/
 │   └── zolt_train.ipynb           # Interactive training and execution notebook
-├── plano-z1-zoneai.md             # Initial project specifications document
 ├── pyproject.toml                 # Package configuration, dependencies, and build metadata
 ├── pytest.ini                     # Pytest runner configuration
 ├── scripts/

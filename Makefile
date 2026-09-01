@@ -127,7 +127,7 @@ clean: ## Limpar caches e ficheiros temporários
 .PHONY: help
 help: ## Mostrar ajuda
 	@echo ""
-	@echo "zolt — zolt.ai | Makefile"
+	@echo "zolt — ZolttyAI | Makefile"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2}'

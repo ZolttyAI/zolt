@@ -1,5 +1,5 @@
 ================================================================================
-zolt
+ZolttyAI
 ================================================================================
 
 Modelo de linguagem causal para geracao de codigo e raciocinio (250.9M parametros por omissao com predefinicao zolt-mini, contexto base de 4096 tokens extensivel para 16384 tokens).
@@ -33,10 +33,9 @@ ESTRUTURA DO REPOSITORIO
 zolt/
 ├── Makefile                       # Alvos de automacao para configuracao, testes, pipeline de dados e treino
 ├── README.md                      # Documentacao do repositorio em ingles
-├── README.txt                     # Documentacao do repositorio em portugues mocambicano (texto simples)
+├── README.txt                     # Documentacao do repositorio em portugues (texto simples)
 ├── notebooks/
 │   └── zolt_train.ipynb           # Caderno interactivo de treino e execucao
-├── plano-z1-zoneai.md             # Documento inicial de especificacoes do projecto
 ├── pyproject.toml                 # Configuracao do pacote, dependencias e metadados de construcao
 ├── pytest.ini                     # Configuracao do executor de testes pytest
 ├── scripts/

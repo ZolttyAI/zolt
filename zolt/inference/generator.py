@@ -124,7 +124,7 @@ class ZoltGenerator:
 
     def format_agent_prompt(
         self,
-        system_prompt: str = "You are zolt, a development assistant and coding agent by zolt.ai.",
+        system_prompt: str = "You are zolt, a development assistant and coding agent by ZolttyAI.",
         user_prompt: str = "",
         include_think_tag: bool = True,
     ) -> str:

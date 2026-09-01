@@ -1,5 +1,5 @@
 """
-zolt - Coding-Agent and Reasoning AI Helper (zolt.ai)
+zolt - Coding-Agent and Reasoning AI Helper (ZolttyAI)
 """
 
 from zolt.config import ZoltConfig

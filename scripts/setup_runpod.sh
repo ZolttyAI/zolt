@@ -1,13 +1,13 @@
 #!/bin/bash
 # ============================================================
-# zolt zolt.ai — Setup Script para RunPod / Vast.ai
+# zolt ZolttyAI — Setup Script para RunPod / Vast.ai
 # Colar no terminal do pod após arranque
 # ============================================================
 
 set -e
 
 echo "============================================================"
-echo "zolt zolt.ai — RunPod Setup"
+echo "zolt ZolttyAI — RunPod Setup"
 echo "============================================================"
 
 # ─── 1. Verificar GPU ────────────────────────────────────────

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "zolt"
 version = "0.1.0"
-description = "zolt - Coding-Agent and Reasoning AI (zolt.ai)"
+description = "zolt - Coding-Agent and Reasoning AI (zolttyAI)"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

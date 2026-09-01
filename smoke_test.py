@@ -6,7 +6,7 @@ import sys
 
 def run_smoke_test():
     print("=" * 60)
-    print("zolt (zolt.ai) - Smoke Test")
+    print("zolt (ZolttyAI) - Smoke Test")
     print("=" * 60)
 
     try:

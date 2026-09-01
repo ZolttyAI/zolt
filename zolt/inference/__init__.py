@@ -109,7 +109,7 @@ def main():
     )
 
     print("=" * 60)
-    print("zolt (zolt.ai) - Coding Agent & Reasoning Assistant")
+    print("zolt (ZolttyAI) - Coding Agent & Reasoning Assistant")
     print(f"Active slice mode: {'Auto-routing' if args.auto_slice else (args.active_dim or 'Full model')}")
     if args.entropy_threshold is not None:
         print(f"Uncertainty tagging: Enabled (threshold={args.entropy_threshold})")

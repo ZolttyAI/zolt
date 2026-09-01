@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Any
 @dataclasses.dataclass
 class ZoltConfig:
     """
-    Configuration for zolt (zolt.ai) Coding-Agent and Reasoning model.
+    Configuration for zolt (ZolttyAI) Coding-Agent and Reasoning model.
     Default architecture targets ~250M parameters (zolt) with extractable sub-network (zolt-mini) support.
     """
     vocab_size: int = 32000
