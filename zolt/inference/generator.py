@@ -2,13 +2,10 @@
 zolt inference and streaming generation engine.
 Includes adaptive MatFormer routing, entropy-based uncertainty tagging, and ChatML prompt formatting.
 """
-import os
-import re
+
+from collections.abc import Generator
 import json
-import math
-import argparse
 from pathlib import Path
-from typing import Optional, Generator, Tuple, List, Union
 
 import torch
 import torch.nn.functional as F
@@ -35,9 +32,7 @@ def is_factual_claim_token(token_text: str) -> bool:
     if not stripped:
         return False
     # Single punctuation characters
-    if len(stripped) == 1 and stripped in ",.;:()[]{}<>=+-*/\\\"'`~|&!%^@#$?":
-        return False
-    return True
+    return not (len(stripped) == 1 and stripped in ",.;:()[]{}<>=+-*/\\\"'`~|&!%^@#$?")
 
 
 def classify_prompt_complexity(
@@ -52,10 +47,29 @@ def classify_prompt_complexity(
     prompt_lower = prompt.lower()
 
     complex_indicators = (
-        "refactor", "design", "architecture", "plan", "optimize", "optimization",
-        "debug", "security", "vulnerability", "audit", "migrate", "migration",
-        "algorithm", "concurrency", "distributed", "microservice", "explain why",
-        "trade-off", "tradeoff", "benchmark", "complex", "performance", "<think>",
+        "refactor",
+        "design",
+        "architecture",
+        "plan",
+        "optimize",
+        "optimization",
+        "debug",
+        "security",
+        "vulnerability",
+        "audit",
+        "migrate",
+        "migration",
+        "algorithm",
+        "concurrency",
+        "distributed",
+        "microservice",
+        "explain why",
+        "trade-off",
+        "tradeoff",
+        "benchmark",
+        "complex",
+        "performance",
+        "<think>",
     )
 
     if any(ind in prompt_lower for ind in complex_indicators):
@@ -72,15 +86,15 @@ class ZoltGenerator:
 
     def __init__(
         self,
-        checkpoint_dir: Optional[str] = None,
-        tokenizer_path: Optional[str] = None,
-        device: Optional[str] = None,
-        active_dim: Optional[int] = None,
+        checkpoint_dir: str | None = None,
+        tokenizer_path: str | None = None,
+        device: str | None = None,
+        active_dim: int | None = None,
         auto_slice: bool = False,
-        entropy_threshold: Optional[float] = None,
-        model: Optional[ZoltForCausalLM] = None,
-        config: Optional[ZoltConfig] = None,
-        tokenizer: Optional[ZoltTokenizer] = None,
+        entropy_threshold: float | None = None,
+        model: ZoltForCausalLM | None = None,
+        config: ZoltConfig | None = None,
+        tokenizer: ZoltTokenizer | None = None,
     ):
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -92,7 +106,7 @@ class ZoltGenerator:
             self.config = config
         elif checkpoint_dir is not None:
             checkpoint_path = Path(checkpoint_dir)
-            with open(checkpoint_path / "config.json", "r") as f:
+            with open(checkpoint_path / "config.json") as f:
                 config_dict = json.load(f)
 
             self.config = ZoltConfig.from_dict(config_dict)
@@ -104,13 +118,16 @@ class ZoltGenerator:
                 self.model.load_state_dict(state_dict)
                 print(f"[zolt-inference] Loaded weights from {model_weights}")
             else:
-                print("[zolt-inference] Warning: 'model.pt' not found, using uninitialized weights.")
+                print(
+                    "[zolt-inference] Warning: 'model.pt' not found, using uninitialized weights."
+                )
         else:
             self.config = ZoltConfig()
             self.model = ZoltForCausalLM(self.config).to(self.device)
 
         self.model.eval()
 
+        self.tokenizer: ZoltTokenizer | None
         if tokenizer is not None:
             self.tokenizer = tokenizer
         elif tokenizer_path is not None and Path(tokenizer_path).exists():
@@ -134,7 +151,7 @@ class ZoltGenerator:
             prompt += "<think>\n"
         return prompt
 
-    def resolve_active_dim(self, prompt: str) -> Optional[int]:
+    def resolve_active_dim(self, prompt: str) -> int | None:
         """Resolve active MatFormer dimension based on manual setting or auto-routing."""
         if self.auto_slice:
             slices = self.config.matformer_slices or [512, 1024]
@@ -150,7 +167,7 @@ class ZoltGenerator:
         max_new_tokens: int = 512,
         temperature: float = 0.7,
         top_p: float = 0.9,
-        entropy_threshold: Optional[float] = None,
+        entropy_threshold: float | None = None,
     ) -> Generator[str, None, None]:
         """Generate tokens autoregressively as a stream with uncertainty tagging."""
         if self.tokenizer is None:
@@ -162,7 +179,9 @@ class ZoltGenerator:
         eos_id = self.config.eos_token_id
         im_end_id = getattr(self.tokenizer, "im_end_id", None)
         active_dim = self.resolve_active_dim(prompt)
-        eff_entropy_thresh = entropy_threshold if entropy_threshold is not None else self.entropy_threshold
+        eff_entropy_thresh = (
+            entropy_threshold if entropy_threshold is not None else self.entropy_threshold
+        )
 
         for _ in range(max_new_tokens):
             idx_cond = input_tensor[:, -self.config.max_seq_len :]
@@ -171,7 +190,7 @@ class ZoltGenerator:
 
             # Uncertainty entropy computation
             token_entropy = compute_token_entropy(step_logits)
-            is_uncertain = (eff_entropy_thresh is not None and token_entropy > eff_entropy_thresh)
+            is_uncertain = eff_entropy_thresh is not None and token_entropy > eff_entropy_thresh
 
             scaled_logits = step_logits / max(temperature, 1e-5)
 
@@ -190,10 +209,11 @@ class ZoltGenerator:
             probs = F.softmax(scaled_logits, dim=-1)
             next_token = torch.multinomial(probs, num_samples=1)
 
-            tok_id = next_token.item()
-            if tok_id == eos_id or tok_id == im_end_id:
+            tok_id = int(next_token.item())
+            if tok_id in (eos_id, im_end_id):
                 break
 
+            assert self.tokenizer is not None
             token_text = self.tokenizer.decode([tok_id], skip_special_tokens=False)
 
             if is_uncertain and is_factual_claim_token(token_text):

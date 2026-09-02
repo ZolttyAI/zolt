@@ -2,8 +2,10 @@
 Curriculum learning utilities for progressive code difficulty staging.
 Provides lightweight complexity scoring and ordering without large-model overhead.
 """
+
+from collections.abc import Callable
 import math
-from typing import List, Dict, Any, Callable, Optional
+from typing import Any
 
 
 def estimate_code_complexity(text: str) -> float:
@@ -15,7 +17,7 @@ def estimate_code_complexity(text: str) -> float:
     if not lines:
         return 0.0
 
-    non_empty = [l for l in lines if l.strip()]
+    non_empty = [line for line in lines if line.strip()]
     if not non_empty:
         return 0.0
 
@@ -37,9 +39,21 @@ def estimate_code_complexity(text: str) -> float:
 
     # 3. Control flow and cyclomatic branching density
     branch_keywords = (
-        "if ", "elif ", "else if ", "for ", "while ",
-        "catch ", "except ", "switch ", "case ", "&&", "||",
-        "lambda ", "async ", "await ", "class "
+        "if ",
+        "elif ",
+        "else if ",
+        "for ",
+        "while ",
+        "catch ",
+        "except ",
+        "switch ",
+        "case ",
+        "&&",
+        "||",
+        "lambda ",
+        "async ",
+        "await ",
+        "class ",
     )
     branch_count = sum(any(kw in line for kw in branch_keywords) for line in non_empty)
     branch_density = branch_count / len(non_empty)
@@ -49,7 +63,7 @@ def estimate_code_complexity(text: str) -> float:
     return round(total_complexity, 2)
 
 
-def estimate_token_sequence_complexity(token_ids: List[int]) -> float:
+def estimate_token_sequence_complexity(token_ids: list[int]) -> float:
     """
     Compute a complexity proxy from token sequence IDs.
     Uses length and unique token diversity (type-token ratio).
@@ -68,12 +82,13 @@ def estimate_token_sequence_complexity(token_ids: List[int]) -> float:
 
 
 def sort_by_curriculum(
-    items: List[Any],
-    complexity_fn: Optional[Callable[[Any], float]] = None,
+    items: list[Any],
+    complexity_fn: Callable[[Any], float] | None = None,
     reverse: bool = False,
-) -> List[Any]:
+) -> list[Any]:
     """Sort a collection of items in order of increasing complexity."""
     if complexity_fn is None:
+
         def default_complexity(item):
             if isinstance(item, str):
                 return estimate_code_complexity(item)
@@ -82,6 +97,7 @@ def sort_by_curriculum(
             elif isinstance(item, dict) and "content" in item:
                 return estimate_code_complexity(item["content"])
             return 0.0
+
         complexity_fn = default_complexity
 
     return sorted(items, key=complexity_fn, reverse=reverse)

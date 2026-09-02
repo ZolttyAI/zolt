@@ -1,0 +1,251 @@
+name: Security
+
+on:
+  schedule:
+    - cron: "0 2 * * *"   # Daily at 02:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write   # needed to create issues on findings
+
+jobs:
+  # ─── Dependency audit (CVEs) ─────────────────────────────────────────────
+  pip-audit:
+    name: Dependency audit (pip-audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          uv pip install torch --index-url https://download.pytorch.org/whl/cpu --system
+          uv pip install tokenizers datasets einops tqdm pip-audit --system
+          uv pip install -e . --system
+
+      - name: Run pip-audit
+        id: pip-audit
+        run: |
+          pip-audit --output json --format json > audit.json || true
+          cat audit.json
+
+      - name: Parse audit results
+        id: parse-audit
+        run: |
+          VULNS=$(python3 -c "
+          import json, sys
+          with open('audit.json') as f:
+              data = json.load(f)
+          vulns = [v for dep in data.get('dependencies', []) for v in dep.get('vulns', [])]
+          high = [v for v in vulns if v.get('aliases', []) or v.get('id', '')]
+          print(len(vulns))
+          " 2>/dev/null || echo "0")
+          echo "vuln_count=$VULNS" >> "$GITHUB_OUTPUT"
+          echo "Found $VULNS vulnerabilities"
+
+      - name: Upload audit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-report
+          path: audit.json
+          retention-days: 30
+
+  # ─── SAST (bandit) ───────────────────────────────────────────────────────
+  bandit:
+    name: SAST (bandit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install bandit
+        run: uv pip install bandit[toml] --system
+
+      - name: Run bandit
+        id: bandit
+        run: |
+          bandit -r zolt/ \
+            --severity-level medium \
+            --confidence-level medium \
+            --format json \
+            --output bandit-report.json || true
+          cat bandit-report.json
+
+      - name: Parse bandit results
+        id: parse-bandit
+        run: |
+          HIGH=$(python3 -c "
+          import json
+          with open('bandit-report.json') as f:
+              data = json.load(f)
+          results = data.get('results', [])
+          high = [r for r in results if r.get('issue_severity') in ('HIGH', 'MEDIUM')]
+          print(len(high))
+          " 2>/dev/null || echo "0")
+          echo "high_count=$HIGH" >> "$GITHUB_OUTPUT"
+          echo "High/Medium findings: $HIGH"
+
+      - name: Upload bandit report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: bandit-report.json
+          retention-days: 30
+
+  # ─── Filesystem scan (trivy) ─────────────────────────────────────────────
+  trivy:
+    name: Filesystem scan (trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          format: json
+          output: trivy-report.json
+          exit-code: 0   # don't fail the step — we create an issue instead
+
+      - name: Parse trivy results
+        id: parse-trivy
+        run: |
+          COUNT=$(python3 -c "
+          import json
+          with open('trivy-report.json') as f:
+              data = json.load(f)
+          total = sum(
+              len(r.get('Vulnerabilities') or [])
+              for result in data.get('Results', [])
+              for r in [result]
+          )
+          print(total)
+          " 2>/dev/null || echo "0")
+          echo "vuln_count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "Trivy findings: $COUNT"
+
+      - name: Upload trivy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.json
+          retention-days: 30
+
+  # ─── Create issue on findings ────────────────────────────────────────────
+  report:
+    name: Report findings
+    runs-on: ubuntu-latest
+    needs: [pip-audit, bandit, trivy]
+    if: always()
+    timeout-minutes: 5
+    permissions:
+      issues: write
+
+    steps:
+      - name: Download all reports
+        uses: actions/download-artifact@v4
+        with:
+          path: reports/
+
+      - name: Create GitHub issue on HIGH findings
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const date = new Date().toISOString().split('T')[0];
+
+            // Collect summaries
+            let body = `## 🔒 Security Scan Report — ${date}\n\n`;
+            body += `Automated daily security scan. Review the [workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) for full reports.\n\n`;
+
+            const tools = [
+              { name: 'pip-audit', file: 'reports/pip-audit-report/audit.json', label: 'Dependency CVEs' },
+              { name: 'bandit', file: 'reports/bandit-report/bandit-report.json', label: 'SAST findings' },
+              { name: 'trivy', file: 'reports/trivy-report/trivy-report.json', label: 'Filesystem scan' },
+            ];
+
+            let hasFindings = false;
+
+            for (const tool of tools) {
+              body += `### ${tool.label} (${tool.name})\n`;
+              try {
+                const raw = fs.readFileSync(tool.file, 'utf8');
+                const data = JSON.parse(raw);
+
+                if (tool.name === 'pip-audit') {
+                  const deps = data.dependencies || [];
+                  const vulns = deps.flatMap(d => (d.vulns || []).map(v => `- **${d.name}@${d.version}**: ${v.id} — ${v.description || 'no description'}`));
+                  if (vulns.length > 0) { hasFindings = true; body += vulns.join('\n') + '\n\n'; }
+                  else body += '_No vulnerabilities found._\n\n';
+                } else if (tool.name === 'bandit') {
+                  const results = data.results || [];
+                  const high = results.filter(r => ['HIGH', 'MEDIUM'].includes(r.issue_severity));
+                  if (high.length > 0) {
+                    hasFindings = true;
+                    body += high.map(r => `- **${r.issue_severity}** ${r.issue_text} — \`${r.filename}:${r.line_number}\``).join('\n') + '\n\n';
+                  } else body += '_No HIGH/MEDIUM findings._\n\n';
+                } else if (tool.name === 'trivy') {
+                  const results = data.Results || [];
+                  const vulns = results.flatMap(r => (r.Vulnerabilities || []).map(v => `- **${v.Severity}** ${v.VulnerabilityID}: ${v.Title || v.PkgName}`));
+                  if (vulns.length > 0) { hasFindings = true; body += vulns.join('\n') + '\n\n'; }
+                  else body += '_No HIGH/CRITICAL vulnerabilities found._\n\n';
+                }
+              } catch (e) {
+                body += `_Report unavailable: ${e.message}_\n\n`;
+              }
+            }
+
+            if (!hasFindings) {
+              console.log('✅ No security findings — skipping issue creation');
+              return;
+            }
+
+            // Check for existing open security issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'security,automated',
+              state: 'open',
+            });
+
+            if (issues.data.length > 0) {
+              // Update existing issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues.data[0].number,
+                body: body,
+              });
+              console.log(`Updated existing issue #${issues.data[0].number}`);
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `🔒 Security findings — ${date}`,
+                body: body,
+                labels: ['security', 'automated'],
+              });
+              console.log('Created new security issue');
+            }

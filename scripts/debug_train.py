@@ -4,10 +4,11 @@ Debug training run with synthetic tokens on CPU.
 Validates training loop, learning rate schedule, and checkpoint persistence.
 Uses a tiny model config to complete quickly on CPU without OOM.
 """
+
 import os
-import sys
-import numpy as np
 import tempfile
+
+import numpy as np
 
 
 def create_debug_tokens(output_path: str, n_tokens: int = 50_000, vocab_size: int = 256):
@@ -56,6 +57,7 @@ def run_debug_train():
 
         # Verify generated checkpoints
         import glob
+
         ckpts = glob.glob(os.path.join(tmpdir, "ckpts", "ckpt-step*"))
         assert len(ckpts) > 0, "No checkpoints saved"
         print(f"\n[debug] Checkpoints created: {[os.path.basename(c) for c in ckpts]}")

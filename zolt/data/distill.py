@@ -4,23 +4,28 @@ Teacher distillation pipeline for synthetic coding and reasoning pairs.
 Generates structured training instances with reasoning traces (<think>...</think>)
 and tool interactions for the zolt stack (Python, TypeScript, JavaScript, Next.js, NestJS).
 """
-import os
-import sys
-import json
-import time
-import random
-import urllib.request
-import urllib.error
-import argparse
-from pathlib import Path
-from typing import List, Dict, Any, Optional, Generator
 
+import argparse
+import json
+import os
+from pathlib import Path
+import random
+import time
+from typing import Any
+import urllib.error
+import urllib.request
 
 DEFAULT_FOCUS_TOPICS = [
     {"lang": "python", "topic": "algorithmic optimization and time-complexity reasoning"},
     {"lang": "python", "topic": "AST transformation and static analysis tool creation"},
-    {"lang": "typescript", "topic": "type-safe state management in React 19 and Next.js App Router"},
-    {"lang": "typescript", "topic": "NestJS microservice controller with DTO validation and guard logic"},
+    {
+        "lang": "typescript",
+        "topic": "type-safe state management in React 19 and Next.js App Router",
+    },
+    {
+        "lang": "typescript",
+        "topic": "NestJS microservice controller with DTO validation and guard logic",
+    },
     {"lang": "javascript", "topic": "high-performance DOM manipulation and virtual scrolling"},
     {"lang": "vue", "topic": "Vue 3 Composition API store with reactive computed caching"},
 ]
@@ -45,18 +50,22 @@ class TeacherClient:
     def __init__(
         self,
         api_base: str = "https://api.openai.com/v1",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         model: str = "gpt-4o",
         timeout: int = 60,
         max_retries: int = 5,
     ):
         self.api_base = api_base.rstrip("/")
-        self.api_key = api_key or os.environ.get("TEACHER_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
+        self.api_key = (
+            api_key or os.environ.get("TEACHER_API_KEY") or os.environ.get("OPENAI_API_KEY") or ""
+        )
         self.model = model
         self.timeout = timeout
         self.max_retries = max_retries
 
-    def complete(self, prompt: str, system_prompt: str = "You are a code synthesis assistant.") -> str:
+    def complete(
+        self, prompt: str, system_prompt: str = "You are a code synthesis assistant."
+    ) -> str:
         """Call teacher endpoint with exponential backoff on rate-limits (HTTP 429)."""
         url = f"{self.api_base}/chat/completions"
         payload = {
@@ -88,24 +97,28 @@ class TeacherClient:
                 status = e.code
                 err_body = e.read().decode("utf-8", errors="replace")
                 if status == 429 or status >= 500:
-                    delay = (2 ** attempt) + random.uniform(0.5, 2.0)
-                    print(f"[zolt-distill] HTTP {status} (attempt {attempt}/{self.max_retries}). Retrying in {delay:.1f}s...")
+                    delay = (2**attempt) + random.uniform(0.5, 2.0)
+                    print(
+                        f"[zolt-distill] HTTP {status} (attempt {attempt}/{self.max_retries}). Retrying in {delay:.1f}s..."
+                    )
                     time.sleep(delay)
                 else:
-                    raise RuntimeError(f"Teacher API error HTTP {status}: {err_body}")
+                    raise RuntimeError(f"Teacher API error HTTP {status}: {err_body}") from e
             except (urllib.error.URLError, TimeoutError) as e:
-                delay = (2 ** attempt) + random.uniform(0.5, 1.5)
-                print(f"[zolt-distill] Network error ({e}) (attempt {attempt}/{self.max_retries}). Retrying in {delay:.1f}s...")
+                delay = (2**attempt) + random.uniform(0.5, 1.5)
+                print(
+                    f"[zolt-distill] Network error ({e}) (attempt {attempt}/{self.max_retries}). Retrying in {delay:.1f}s..."
+                )
                 time.sleep(delay)
 
         raise TimeoutError(f"Teacher API failed after {self.max_retries} attempts.")
 
 
 def generate_synthetic_instance(
-    client: Optional[TeacherClient],
-    topic_spec: Dict[str, str],
+    client: TeacherClient | None,
+    topic_spec: dict[str, str],
     mock_mode: bool = False,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Generate a single formatted synthetic code & reasoning instance."""
     lang = topic_spec.get("lang", "python")
     topic = topic_spec.get("topic", "code logic")
@@ -122,7 +135,7 @@ def generate_synthetic_instance(
             code = (
                 f"# Implementation for {topic}\n"
                 f"def solve(data: list) -> dict:\n"
-                f"    \"\"\"Process data efficiently.\"\"\"\n"
+                f'    """Process data efficiently."""\n'
                 f"    result = {{k: v for k, v in enumerate(data)}}\n"
                 f"    return result\n"
             )
@@ -162,14 +175,16 @@ def run_distillation(
     n_samples: int = 100,
     api_base: str = "https://api.openai.com/v1",
     model: str = "gpt-4o",
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
     mock_mode: bool = False,
 ) -> int:
     """Run distillation loop and save generated instances to JSONL."""
     out_path = Path(output_jsonl)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    client = TeacherClient(api_base=api_base, api_key=api_key, model=model) if not mock_mode else None
+    client = (
+        TeacherClient(api_base=api_base, api_key=api_key, model=model) if not mock_mode else None
+    )
 
     count = 0
     with open(out_path, "w", encoding="utf-8") as f:
@@ -179,18 +194,20 @@ def run_distillation(
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
             count += 1
             if count % 10 == 0 or count == n_samples:
-                print(f"[zolt-distill] Generated {count}/{n_samples} synthetic instances -> {out_path}")
+                print(
+                    f"[zolt-distill] Generated {count}/{n_samples} synthetic instances -> {out_path}"
+                )
 
     return count
 
 
 def mix_datasets(
-    corpus_jsonl_paths: List[str],
-    distilled_jsonl_paths: List[str],
+    corpus_jsonl_paths: list[str],
+    distilled_jsonl_paths: list[str],
     output_path: str,
     distill_ratio: float = 0.20,
     seed: int = 42,
-) -> Dict[str, int]:
+) -> dict[str, Any]:
     """
     Mix raw corpus data with teacher-distilled data at specified ratio.
     distill_ratio: fraction of final dataset composed of distilled data (e.g. 0.20 = 20% distilled, 80% corpus).
@@ -202,7 +219,7 @@ def mix_datasets(
     corpus_records = []
     for cp in corpus_jsonl_paths:
         if os.path.exists(cp):
-            with open(cp, "r", encoding="utf-8") as f:
+            with open(cp, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line:
@@ -211,7 +228,7 @@ def mix_datasets(
     distilled_records = []
     for dp in distilled_jsonl_paths:
         if os.path.exists(dp):
-            with open(dp, "r", encoding="utf-8") as f:
+            with open(dp, encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line:
@@ -237,7 +254,9 @@ def mix_datasets(
             selected_corpus = list(corpus_records)
         else:
             selected_distilled = list(distilled_records)
-            desired_corpus = int(len(distilled_records) * (1.0 - distill_ratio) / max(1e-5, distill_ratio))
+            desired_corpus = int(
+                len(distilled_records) * (1.0 - distill_ratio) / max(1e-5, distill_ratio)
+            )
             selected_corpus = rng.sample(corpus_records, min(len(corpus_records), desired_corpus))
 
     mixed = selected_corpus + selected_distilled
@@ -259,15 +278,30 @@ def mix_datasets(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="zolt Teacher Distillation")
-    parser.add_argument("--output", default="data/distilled/synthetic_reasoning.jsonl", help="Output JSONL path")
-    parser.add_argument("--n_samples", type=int, default=50, help="Number of synthetic instances to generate")
-    parser.add_argument("--api_base", default="https://api.openai.com/v1", help="Teacher API base URL")
+    parser.add_argument(
+        "--output", default="data/distilled/synthetic_reasoning.jsonl", help="Output JSONL path"
+    )
+    parser.add_argument(
+        "--n_samples", type=int, default=50, help="Number of synthetic instances to generate"
+    )
+    parser.add_argument(
+        "--api_base", default="https://api.openai.com/v1", help="Teacher API base URL"
+    )
     parser.add_argument("--model", default="gpt-4o", help="Teacher model name")
     parser.add_argument("--api_key", default=None, help="API Key (or set TEACHER_API_KEY env var)")
-    parser.add_argument("--mock", action="store_true", help="Generate synthetic instances offline without API call")
-    parser.add_argument("--mix_corpus", nargs="*", default=None, help="Corpus JSONL paths to mix with")
+    parser.add_argument(
+        "--mock", action="store_true", help="Generate synthetic instances offline without API call"
+    )
+    parser.add_argument(
+        "--mix_corpus", nargs="*", default=None, help="Corpus JSONL paths to mix with"
+    )
     parser.add_argument("--mix_output", default=None, help="Output path for mixed dataset")
-    parser.add_argument("--distill_ratio", type=float, default=0.20, help="Fraction of distilled data in mixed dataset")
+    parser.add_argument(
+        "--distill_ratio",
+        type=float,
+        default=0.20,
+        help="Fraction of distilled data in mixed dataset",
+    )
     args = parser.parse_args()
 
     run_distillation(

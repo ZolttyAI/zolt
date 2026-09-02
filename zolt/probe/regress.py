@@ -8,19 +8,19 @@ Supports two supervised targets:
 Each head is a separate module with its own weights and training loop.
 The backbone is always frozen.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 # Registered target names with their expected value ranges
-REGRESSION_TARGETS: Dict[str, Dict] = {
+REGRESSION_TARGETS: dict[str, dict] = {
     "quality_score": {"min": 0.0, "max": 1.0, "description": "Textbook quality heuristic score"},
-    "complexity":    {"min": 0.0, "max": None, "description": "AST-based code complexity estimate"},
+    "complexity": {"min": 0.0, "max": None, "description": "AST-based code complexity estimate"},
 }
 
 
@@ -77,7 +77,7 @@ class RegressionProbe:
         hidden_dim: int = 256,
         dropout: float = 0.1,
         loss: str = "mse",
-        device: Optional[torch.device] = None,
+        device: torch.device | None = None,
     ):
         """
         Args:
@@ -100,6 +100,7 @@ class RegressionProbe:
         self.loss_name = loss
         self.device = device or torch.device("cpu")
 
+        self.model: nn.Module
         if arch == "mlp":
             self.model = MLPRegressionHead(input_dim, output_dim, hidden_dim, dropout)
         else:
@@ -120,7 +121,7 @@ class RegressionProbe:
         weight_decay: float = 1e-4,
         batch_size: int = 64,
         verbose: bool = False,
-    ) -> List[float]:
+    ) -> list[float]:
         """
         Train the regression head on labeled embeddings.
         Returns per-epoch loss values.
@@ -153,7 +154,9 @@ class RegressionProbe:
             avg_loss = epoch_loss / max(steps, 1)
             losses.append(avg_loss)
             if verbose:
-                print(f"[probe-regress:{self.target_name}] epoch {epoch + 1}/{n_epochs} loss={avg_loss:.6f}")
+                print(
+                    f"[probe-regress:{self.target_name}] epoch {epoch + 1}/{n_epochs} loss={avg_loss:.6f}"
+                )
 
         self.model.eval()
         return losses
@@ -180,7 +183,7 @@ class RegressionProbe:
             return 0.0
         return (vp * vt).sum().item() / denom
 
-    def save(self, path: Union[str, Path]) -> None:
+    def save(self, path: str | Path) -> None:
         """Serialize probe weights and metadata to disk."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -196,7 +199,9 @@ class RegressionProbe:
         )
 
     @classmethod
-    def load(cls, path: Union[str, Path], input_dim: int, device: Optional[torch.device] = None) -> "RegressionProbe":
+    def load(
+        cls, path: str | Path, input_dim: int, device: torch.device | None = None
+    ) -> RegressionProbe:
         """Load a previously saved regression probe from disk."""
         data = torch.load(path, map_location="cpu")
         arch = "mlp" if "MLP" in data["arch"] else "linear"
@@ -215,8 +220,8 @@ class RegressionProbe:
 
 def build_regression_suite(
     input_dim: int,
-    device: Optional[torch.device] = None,
-) -> Dict[str, RegressionProbe]:
+    device: torch.device | None = None,
+) -> dict[str, RegressionProbe]:
     """
     Instantiate both standard regression probes (quality_score and complexity).
     Returns a dict keyed by target name for convenient batch usage.

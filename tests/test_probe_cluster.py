@@ -1,13 +1,12 @@
 """Tests for KMeansCluster: fit, assign, centroid_distances, save/load."""
-import tempfile
+
 from pathlib import Path
+import tempfile
 
 import pytest
 import torch
-import numpy as np
 
 from zolt.probe.cluster import KMeansCluster
-
 
 DIM = 32
 N = 200
@@ -26,6 +25,7 @@ def _clustered_data(k: int, n_per: int, dim: int, seed: int = 42) -> torch.Tenso
 
 
 # ── Fit ───────────────────────────────────────────────────────────────────────
+
 
 def test_fit_returns_self():
     km = KMeansCluster(n_clusters=4, n_init=2, max_iter=20)
@@ -57,6 +57,7 @@ def test_inertia_decreases_with_separable_data():
 
 # ── Assign ────────────────────────────────────────────────────────────────────
 
+
 def test_assign_returns_correct_shape():
     km = KMeansCluster(n_clusters=4, n_init=2)
     emb = _clustered_data(4, 50, DIM)
@@ -87,6 +88,7 @@ def test_assign_before_fit_raises():
 
 # ── Centroid distances ────────────────────────────────────────────────────────
 
+
 def test_centroid_distances_shape():
     km = KMeansCluster(n_clusters=4, n_init=2)
     km.fit(_clustered_data(4, 50, DIM))
@@ -109,6 +111,7 @@ def test_centroid_distances_before_fit_raises():
 
 
 # ── Save/load ─────────────────────────────────────────────────────────────────
+
 
 def test_save_load_roundtrip():
     km = KMeansCluster(n_clusters=4, n_init=2)
@@ -144,4 +147,3 @@ def test_extract_embeddings_default_pool():
     assert torch.allclose(emb_default, emb_last)
     assert not torch.allclose(emb_default, emb_mean)
     assert emb_default.shape == (2, 64)
-

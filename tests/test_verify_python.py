@@ -2,13 +2,14 @@
 Tests for verify_python.py: valid syntax, invalid syntax, code extraction,
 retry loop success/exhausted, and checker distinctions (ast vs mypy).
 """
+
 import unittest.mock as mock
-import pytest
-from zolt.inference.verify_python import (
-    verify_python_code,
-    self_correcting_generate_python,
-)
+
 from zolt.inference.verify_base import extract_code_block
+from zolt.inference.verify_python import (
+    self_correcting_generate_python,
+    verify_python_code,
+)
 
 
 class MockGenerator:
@@ -26,12 +27,7 @@ class MockGenerator:
 
 
 def test_verify_python_valid_syntax():
-    code = (
-        "def add(a: int, b: int) -> int:\n"
-        "    return a + b\n"
-        "\n"
-        "result = add(1, 2)\n"
-    )
+    code = "def add(a: int, b: int) -> int:\n    return a + b\n\nresult = add(1, 2)\n"
     res = verify_python_code(code)
     assert res["valid"]
     # Python is always available, so verified must always be True
@@ -70,18 +66,20 @@ def test_verify_python_mypy_failure_propagated():
     def mock_which(name):
         return fake_mypy if name == "mypy" else None
 
-    with mock.patch("zolt.inference.verify_python.shutil.which", side_effect=mock_which):
-        with mock.patch("zolt.inference.verify_python.subprocess.run") as mock_run:
-            mock_run.return_value = mock.Mock(
-                returncode=1,
-                stdout="error: Incompatible types\n",
-                stderr="",
-            )
-            res = verify_python_code("x: int = 'not an int'")
+    with (
+        mock.patch("zolt.inference.verify_python.shutil.which", side_effect=mock_which),
+        mock.patch("zolt.inference.verify_python.subprocess.run") as mock_run,
+    ):
+        mock_run.return_value = mock.Mock(
+            returncode=1,
+            stdout="error: Incompatible types\n",
+            stderr="",
+        )
+        res = verify_python_code("x: int = 'not an int'")
 
     assert not res["valid"]
     assert res["checker"] == "mypy"
-    assert res["verified"] is True   # mypy ran; verified=True because the tool ran
+    assert res["verified"] is True  # mypy ran; verified=True because the tool ran
     assert "Incompatible" in res["error"]
 
 

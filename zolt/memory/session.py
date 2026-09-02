@@ -5,16 +5,15 @@ Persistent key-value store mapping embedding vectors to text strings.
 Stored as a NumPy .npz archive at ~/.zolt/memory/session.npz by default.
 Retrieval by cosine similarity with configurable top-k and threshold.
 """
+
 from __future__ import annotations
 
 import json
-import time
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+import time
 
 import numpy as np
 import torch
-
 
 _DEFAULT_PATH = Path.home() / ".zolt" / "memory" / "session.npz"
 _FORMAT_VERSION = "1"
@@ -37,7 +36,7 @@ class SessionMemory:
     def __init__(
         self,
         dim: int,
-        path: Union[str, Path] = _DEFAULT_PATH,
+        path: str | Path = _DEFAULT_PATH,
         max_entries: int = 10_000,
     ):
         self.dim = dim
@@ -46,14 +45,14 @@ class SessionMemory:
 
         # In-memory store
         self._keys: np.ndarray = np.empty((0, dim), dtype=np.float32)
-        self._values: List[str] = []
-        self._timestamps: List[float] = []
+        self._values: list[str] = []
+        self._timestamps: list[float] = []
 
     def _normalize(self, v: np.ndarray) -> np.ndarray:
         norm = np.linalg.norm(v, axis=-1, keepdims=True)
         return v / np.maximum(norm, 1e-12)
 
-    def add(self, embedding: Union[torch.Tensor, np.ndarray], text: str) -> None:
+    def add(self, embedding: torch.Tensor | np.ndarray, text: str) -> None:
         """
         Add an (embedding, text) pair to memory.
         If max_entries is reached, the oldest entries are evicted first.
@@ -77,6 +76,7 @@ class SessionMemory:
 
         if len(self._values) > _MAX_ENTRIES_WARNING:
             import warnings
+
             warnings.warn(
                 f"[SessionMemory] {len(self._values)} entries exceed the recommended "
                 f"limit of {_MAX_ENTRIES_WARNING}. Consider using an approximate index "
@@ -87,10 +87,10 @@ class SessionMemory:
 
     def retrieve(
         self,
-        embedding: Union[torch.Tensor, np.ndarray],
+        embedding: torch.Tensor | np.ndarray,
         top_k: int = 3,
         threshold: float = 0.0,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Retrieve top-k most similar entries by cosine similarity.
 
@@ -121,11 +121,13 @@ class SessionMemory:
         top_idx = candidates[np.argsort(-similarities[candidates])[:top_k]]
         results = []
         for idx in top_idx:
-            results.append({
-                "text": self._values[int(idx)],
-                "similarity": float(similarities[idx]),
-                "index": int(idx),
-            })
+            results.append(
+                {
+                    "text": self._values[int(idx)],
+                    "similarity": float(similarities[idx]),
+                    "index": int(idx),
+                }
+            )
         return results
 
     def _evict_oldest(self, n: int = 1) -> None:
@@ -147,17 +149,19 @@ class SessionMemory:
         self._evict_oldest(to_remove)
         return to_remove
 
-    def save(self, path: Optional[Union[str, Path]] = None) -> Path:
+    def save(self, path: str | Path | None = None) -> Path:
         """Persist memory to a .npz file. Returns the path written."""
         save_path = Path(path) if path else self.path
         save_path.parent.mkdir(parents=True, exist_ok=True)
 
-        meta = json.dumps({
-            "version": _FORMAT_VERSION,
-            "dim": self.dim,
-            "entry_count": len(self._values),
-            "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        })
+        meta = json.dumps(
+            {
+                "version": _FORMAT_VERSION,
+                "dim": self.dim,
+                "entry_count": len(self._values),
+                "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            }
+        )
 
         np.savez_compressed(
             save_path,
@@ -169,7 +173,7 @@ class SessionMemory:
         return save_path
 
     @classmethod
-    def load(cls, path: Union[str, Path], max_entries: int = 10_000) -> "SessionMemory":
+    def load(cls, path: str | Path, max_entries: int = 10_000) -> SessionMemory:
         """
         Load a SessionMemory from a .npz file.
         Raises FileNotFoundError if the path does not exist.
@@ -192,9 +196,9 @@ class SessionMemory:
     def load_or_create(
         cls,
         dim: int,
-        path: Union[str, Path] = _DEFAULT_PATH,
+        path: str | Path = _DEFAULT_PATH,
         max_entries: int = 10_000,
-    ) -> "SessionMemory":
+    ) -> SessionMemory:
         """
         Load existing memory from path, or create a new empty store if the file
         does not exist. The most convenient constructor for typical usage.

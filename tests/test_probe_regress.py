@@ -1,16 +1,16 @@
 """Tests for RegressionProbe: quality_score and complexity targets, Pearson r, save/load."""
-import tempfile
+
 from pathlib import Path
+import tempfile
 
 import pytest
 import torch
 
 from zolt.probe.regress import (
+    REGRESSION_TARGETS,
     RegressionProbe,
     build_regression_suite,
-    REGRESSION_TARGETS,
 )
-
 
 DIM = 64
 N = 80
@@ -32,6 +32,7 @@ def _complexity_targets(n: int) -> torch.Tensor:
 
 
 # ── Construction ──────────────────────────────────────────────────────────────
+
 
 def test_registered_targets():
     assert "quality_score" in REGRESSION_TARGETS
@@ -63,6 +64,7 @@ def test_build_regression_suite_keys():
 
 # ── Training ──────────────────────────────────────────────────────────────────
 
+
 def test_fit_quality_returns_losses():
     probe = RegressionProbe(input_dim=DIM, target_name="quality_score")
     losses = probe.fit(
@@ -71,7 +73,7 @@ def test_fit_quality_returns_losses():
         n_epochs=5,
     )
     assert len(losses) == 5
-    assert all(l >= 0 for l in losses)
+    assert all(loss >= 0 for loss in losses)
 
 
 def test_fit_complexity_huber():
@@ -85,6 +87,7 @@ def test_fit_complexity_huber():
 
 
 # ── Prediction and metric ─────────────────────────────────────────────────────
+
 
 def test_predict_shape():
     probe = RegressionProbe(input_dim=DIM, target_name="quality_score")
@@ -115,6 +118,7 @@ def test_pearson_r_perfect_target():
 
 
 # ── Serialization ─────────────────────────────────────────────────────────────
+
 
 def test_save_load_roundtrip():
     probe = RegressionProbe(input_dim=DIM, target_name="quality_score")

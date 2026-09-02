@@ -1,5 +1,9 @@
 # ZolttyAI
 
+[![CI](https://github.com/ZolttyAI/zolt/actions/workflows/ci.yml/badge.svg)](https://github.com/ZolttyAI/zolt/actions/workflows/ci.yml)
+[![Security](https://github.com/ZolttyAI/zolt/actions/workflows/security.yml/badge.svg)](https://github.com/ZolttyAI/zolt/actions/workflows/security.yml)
+[![Nightly](https://github.com/ZolttyAI/zolt/actions/workflows/nightly.yml/badge.svg)](https://github.com/ZolttyAI/zolt/actions/workflows/nightly.yml)
+
 Causal language model for code generation and reasoning (250.9M default parameters with `zolt-mini` sub-network slice, 4096 base context extendable to 16384 tokens).
 
 ## Architecture

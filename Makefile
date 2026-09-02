@@ -18,15 +18,37 @@ setup-gpu: ## Instalar dependências com suporte GPU (para RunPod/Colab)
 	$(UV) pip install torch --python $(PYTHON)
 	$(UV) pip install tokenizers datasets pytest einops tqdm wandb --python $(PYTHON)
 
-# ─── Testes ─────────────────────────────────────────────────────────────────
+# ─── Qualidade & Testes ───────────────────────────────────────────────────────
+
+.PHONY: lint
+lint: ## Verificar formatação e regras com ruff
+	$(PYTHON) -m ruff check zolt/ tests/ scripts/
+	$(PYTHON) -m ruff format --check zolt/ tests/ scripts/
+
+.PHONY: format
+format: ## Formatar código automaticamente com ruff
+	$(PYTHON) -m ruff format zolt/ tests/ scripts/
+	$(PYTHON) -m ruff check --fix zolt/ tests/ scripts/
+
+.PHONY: typecheck
+typecheck: ## Verificar tipos estáticos com mypy
+	$(PYTHON) -m mypy zolt/ --ignore-missing-imports --no-error-summary
 
 .PHONY: test
 test: ## Correr todos os testes unitários
 	$(PYTHON) -m pytest tests/ -v
 
+.PHONY: test-cov
+test-cov: ## Correr testes com relatório de cobertura de código
+	$(PYTHON) -m pytest tests/ -v --cov=zolt --cov-report=term-missing --cov-report=xml
+
 .PHONY: smoke
 smoke: ## Smoke test rápido (valida arquitetura sem dados reais)
 	$(PYTHON) smoke_test.py
+
+.PHONY: ci
+ci: lint typecheck smoke test ## Pipeline de CI local completo (lint + types + smoke + tests)
+
 
 # ─── Dados ──────────────────────────────────────────────────────────────────
 

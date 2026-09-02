@@ -1,13 +1,13 @@
 """Unit tests for adaptive MatFormer routing and explicit uncertainty tagging."""
+
 import torch
-import pytest
+
 from zolt.config import ZoltConfig
-from zolt.model import ZoltForCausalLM
 from zolt.inference.generator import (
+    ZoltGenerator,
     classify_prompt_complexity,
     compute_token_entropy,
     is_factual_claim_token,
-    ZoltGenerator,
 )
 
 
@@ -66,6 +66,7 @@ def test_is_factual_claim_token():
 
 class MockTokenizer:
     """Mock tokenizer for testing uncertainty tag generation."""
+
     def __init__(self):
         self.im_end_id = 999
         self.vocab = {"def": 1, " ": 2, "compute": 3, "<eos>": 4}
@@ -80,6 +81,7 @@ class MockTokenizer:
 
 class MockModel(torch.nn.Module):
     """Mock model returning controllable logits for entropy testing."""
+
     def __init__(self, high_uncertainty: bool):
         super().__init__()
         self.high_uncertainty = high_uncertainty

@@ -1,5 +1,6 @@
 import dataclasses
-from typing import Optional, List, Dict, Any
+from typing import Any
+
 
 @dataclasses.dataclass
 class ZoltConfig:
@@ -7,22 +8,23 @@ class ZoltConfig:
     Configuration for zolt (ZolttyAI) Coding-Agent and Reasoning model.
     Default architecture targets ~250M parameters (zolt) with extractable sub-network (zolt-mini) support.
     """
+
     vocab_size: int = 32000
     dim: int = 1024
     n_layers: int = 16
     n_heads: int = 16
-    n_kv_heads: Optional[int] = None
-    hidden_dim: Optional[int] = 3072  # SwiGLU intermediate dimension
-    max_seq_len: int = 4096           # Base sequence length (extended to 16K via RoPE scaling)
+    n_kv_heads: int | None = None
+    hidden_dim: int | None = 3072  # SwiGLU intermediate dimension
+    max_seq_len: int = 4096  # Base sequence length (extended to 16K via RoPE scaling)
     rope_theta: float = 10000.0
-    rope_scaling_type: Optional[str] = None  # None, "linear", or "ntk"
-    rope_scaling_factor: float = 1.0        # e.g., 4.0 to extend 4K -> 16K
+    rope_scaling_type: str | None = None  # None, "linear", or "ntk"
+    rope_scaling_factor: float = 1.0  # e.g., 4.0 to extend 4K -> 16K
     norm_eps: float = 1e-6
     initializer_range: float = 0.02
 
     # e4b / MatFormer (sparse nested activation support inspired by Gemma 3n)
     matformer_enabled: bool = True
-    matformer_slices: List[int] = dataclasses.field(default_factory=lambda: [512, 1024])
+    matformer_slices: list[int] = dataclasses.field(default_factory=lambda: [512, 1024])
 
     # Overtraining recipe (ratio of training tokens to model parameters, 50x-100x)
     tokens_per_param_ratio: float = 75.0
@@ -53,11 +55,11 @@ class ZoltConfig:
             hidden = int(2 * 4 * self.dim / 3)
             self.hidden_dim = ((hidden + 255) // 256) * 256
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return dataclasses.asdict(self)
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "ZoltConfig":
+    def from_dict(cls, d: dict[str, Any]) -> "ZoltConfig":
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
     @classmethod

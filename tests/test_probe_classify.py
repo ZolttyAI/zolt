@@ -1,19 +1,17 @@
 """Tests for ClassificationProbe: label set, training, prediction, save/load."""
-import tempfile
-from pathlib import Path
 
-import pytest
+from pathlib import Path
+import tempfile
+
 import torch
 
 from zolt.probe.classify import (
-    ClassificationProbe,
     DEFAULT_INTENT_LABELS,
-    DEFAULT_LANG_LABELS,
-    build_label_set,
+    ClassificationProbe,
     LinearProbe,
     MLPProbe,
+    build_label_set,
 )
-
 
 DIM = 64
 N = 80
@@ -26,11 +24,13 @@ def _random_embeddings(n: int, dim: int) -> torch.Tensor:
 
 def _random_labels(labels: list, n: int) -> list:
     import random
+
     random.seed(7)
     return [random.choice(labels) for _ in range(n)]
 
 
 # ── Label set ─────────────────────────────────────────────────────────────────
+
 
 def test_default_intent_labels_nonempty():
     assert len(DEFAULT_INTENT_LABELS) > 0
@@ -61,6 +61,7 @@ def test_build_label_set_hybrid_predefined_first():
 
 # ── Probe construction ────────────────────────────────────────────────────────
 
+
 def test_linear_probe_construction():
     probe = ClassificationProbe(input_dim=DIM, arch="linear")
     assert isinstance(probe.model, LinearProbe)
@@ -84,13 +85,14 @@ def test_custom_labels_registered():
 
 # ── Training ──────────────────────────────────────────────────────────────────
 
+
 def test_fit_returns_loss_list():
     probe = ClassificationProbe(input_dim=DIM, predefined_labels=["a", "b"])
     emb = _random_embeddings(N, DIM)
     lbl = _random_labels(["a", "b"], N)
     losses = probe.fit(emb, lbl, n_epochs=3)
     assert len(losses) == 3
-    assert all(isinstance(l, float) for l in losses)
+    assert all(isinstance(loss, float) for loss in losses)
 
 
 def test_fit_decreases_loss():
@@ -102,6 +104,7 @@ def test_fit_decreases_loss():
 
 
 # ── Prediction ────────────────────────────────────────────────────────────────
+
 
 def test_predict_returns_label_strings():
     probe = ClassificationProbe(input_dim=DIM, predefined_labels=["x", "y"])
@@ -127,6 +130,7 @@ def test_accuracy_returns_float():
 
 
 # ── Serialization ─────────────────────────────────────────────────────────────
+
 
 def test_save_load_roundtrip():
     probe = ClassificationProbe(input_dim=DIM, predefined_labels=["a", "b"])

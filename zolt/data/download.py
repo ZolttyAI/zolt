@@ -2,38 +2,43 @@
 """
 Download and prepare training datasets (The Stack v2, StarCoderData).
 """
-import os
-import json
-import argparse
-from pathlib import Path
 
+import argparse
+import json
+import os
+from pathlib import Path
+from typing import Any
 
 # --- Source configuration ---
 
 # Target languages and their respective dataset directory names in The Stack v2
 STACK_V2_LANGS = {
-    "javascript":  "JavaScript",
-    "typescript":  "TypeScript",
-    "python":      "Python",
-    "vue":         "Vue",
-    "css":         "CSS",
-    "html":        "HTML",
-    "markdown":    "Markdown",
-    "json":        "JSON",
-    "yaml":        "YAML",
+    "javascript": "JavaScript",
+    "typescript": "TypeScript",
+    "python": "Python",
+    "vue": "Vue",
+    "css": "CSS",
+    "html": "HTML",
+    "markdown": "Markdown",
+    "json": "JSON",
+    "yaml": "YAML",
 }
 
 STARCODER_LANGS = [
-    "javascript", "typescript", "python",
-    "vue", "css", "html",
+    "javascript",
+    "typescript",
+    "python",
+    "vue",
+    "css",
+    "html",
 ]
 
 
 def download_stack_v2(
     output_dir: str,
-    langs: list = None,
+    langs: list[str] | None = None,
     max_samples_per_lang: int = 500_000,
-    hf_token: str = None,
+    hf_token: str | None = None,
 ):
     """
     Download a filtered subset of The Stack v2 for target languages.
@@ -48,12 +53,12 @@ def download_stack_v2(
     if langs is None:
         langs = list(STACK_V2_LANGS.keys())
 
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     for lang in langs:
         lang_name = STACK_V2_LANGS.get(lang, lang)
-        out_path = output_dir / f"stack_v2_{lang}.jsonl"
+        out_path = out_dir / f"stack_v2_{lang}.jsonl"
 
         if out_path.exists():
             print(f"[zolt-data] Already exists: {out_path} - skipping")
@@ -73,11 +78,11 @@ def download_stack_v2(
             with open(out_path, "w", encoding="utf-8") as f:
                 for sample in ds:
                     record = {
-                        "content":  sample.get("content", ""),
-                        "lang":     lang,
-                        "license":  sample.get("license", ""),
-                        "repo":     sample.get("repo_name", ""),
-                        "path":     sample.get("path", ""),
+                        "content": sample.get("content", ""),
+                        "lang": lang,
+                        "license": sample.get("license", ""),
+                        "repo": sample.get("repo_name", ""),
+                        "path": sample.get("path", ""),
                     }
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
                     count += 1
@@ -91,9 +96,9 @@ def download_stack_v2(
 
 def download_starcoder(
     output_dir: str,
-    langs: list = None,
+    langs: list[str] | None = None,
     max_samples_per_lang: int = 300_000,
-    hf_token: str = None,
+    hf_token: str | None = None,
 ):
     """
     Download a subset of StarCoderData for target languages.
@@ -107,11 +112,11 @@ def download_starcoder(
     if langs is None:
         langs = STARCODER_LANGS
 
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     for lang in langs:
-        out_path = output_dir / f"starcoder_{lang}.jsonl"
+        out_path = out_dir / f"starcoder_{lang}.jsonl"
 
         if out_path.exists():
             print(f"[zolt-data] Already exists: {out_path} - skipping")
@@ -127,25 +132,6 @@ def download_starcoder(
                 token=hf_token,
             )
 
-            count = 0
-            with open(out_path, "w", encoding="utf-8") as f:
-                for sample in ds:
-                    record = {
-                        "content":  sample.get("content", ""),
-                        "lang":     lang,
-                        "license":  sample.get("license", "mit"),
-                        "repo":     sample.get("repo_name", ""),
-                        "path":     sample.get("path", ""),
-                    }
-                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
-                    count += 1
-                    if count >= max_samples_per_lang:
-                        break
-                data_dir=lang_path,
-                split="train",
-                streaming=True,
-                token=hf_token,
-            )
             count = 0
             with open(out_path, "w", encoding="utf-8") as f:
                 for item in ds:
@@ -167,13 +153,13 @@ def download_starcoder(
             print(f"[zolt-data] Error downloading {lang}: {e}")
 
 
-def estimate_tokens(jsonl_path: str, sample_size: int = 5000) -> Dict[str, Any]:
+def estimate_tokens(jsonl_path: str, sample_size: int = 5000) -> dict[str, Any]:
     """Estimate total token count from a JSONL file via character heuristic."""
     char_count = 0
     line_count = 0
 
-    with open(jsonl_path, "r", encoding="utf-8", errors="replace") as f:
-        for i, line in enumerate(f):
+    with open(jsonl_path, encoding="utf-8", errors="replace") as f:
+        for line in f:
             try:
                 obj = json.loads(line)
                 content = obj.get("content", "")
@@ -198,13 +184,23 @@ def estimate_tokens(jsonl_path: str, sample_size: int = 5000) -> Dict[str, Any]:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="zolt Data Downloader")
-    parser.add_argument("--source", choices=["starcoder", "stack_v2", "both"], default="starcoder",
-                        help="Data source to download")
+    parser.add_argument(
+        "--source",
+        choices=["starcoder", "stack_v2", "both"],
+        default="starcoder",
+        help="Data source to download",
+    )
     parser.add_argument("--output_dir", default="data/raw", help="Output directory")
     parser.add_argument("--langs", nargs="+", default=None, help="Target languages")
-    parser.add_argument("--max_samples", type=int, default=300_000, help="Maximum samples per language")
-    parser.add_argument("--hf_token", default=os.environ.get("HF_TOKEN"), help="Hugging Face authentication token")
-    parser.add_argument("--estimate", default=None, help="Estimate token count of an existing JSONL file")
+    parser.add_argument(
+        "--max_samples", type=int, default=300_000, help="Maximum samples per language"
+    )
+    parser.add_argument(
+        "--hf_token", default=os.environ.get("HF_TOKEN"), help="Hugging Face authentication token"
+    )
+    parser.add_argument(
+        "--estimate", default=None, help="Estimate token count of an existing JSONL file"
+    )
     args = parser.parse_args()
 
     if args.estimate:

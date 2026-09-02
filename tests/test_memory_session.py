@@ -1,13 +1,13 @@
 """Tests for SessionMemory: add, retrieve, eviction, persistence, load_or_create."""
-import tempfile
-from pathlib import Path
 
+from pathlib import Path
+import tempfile
+
+import numpy as np
 import pytest
 import torch
-import numpy as np
 
 from zolt.memory.session import SessionMemory
-
 
 DIM = 64
 
@@ -19,6 +19,7 @@ def _vec(seed: int) -> torch.Tensor:
 
 
 # ── Basic operations ──────────────────────────────────────────────────────────
+
 
 def test_empty_memory_has_zero_len():
     mem = SessionMemory(dim=DIM)
@@ -45,6 +46,7 @@ def test_add_wrong_dim_raises():
 
 
 # ── Retrieval ─────────────────────────────────────────────────────────────────
+
 
 def test_retrieve_empty_returns_empty_list():
     mem = SessionMemory(dim=DIM)
@@ -93,6 +95,7 @@ def test_retrieve_threshold_filters():
 
 # ── Eviction ──────────────────────────────────────────────────────────────────
 
+
 def test_max_entries_evicts_oldest():
     mem = SessionMemory(dim=DIM, max_entries=3)
     for i in range(5):
@@ -123,6 +126,7 @@ def test_evict_oldest_no_op_when_under_limit():
 
 
 # ── Persistence ───────────────────────────────────────────────────────────────
+
 
 def test_save_load_roundtrip():
     mem = SessionMemory(dim=DIM)
