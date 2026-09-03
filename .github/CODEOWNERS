@@ -1,0 +1,32 @@
+# CODEOWNERS — automatic review assignment
+# Syntax: <pattern> <owner> [<owner2> ...]
+# Last entry matching a path wins.
+
+# Default: all files require core team review
+*                                   @ZolttyAI/core
+
+# Model architecture — requires ML lead sign-off
+/zolt/model.py                      @ZolttyAI/core @ZolttyAI/ml
+/zolt/config.py                     @ZolttyAI/core @ZolttyAI/ml
+/zolt/rope_scaling.py               @ZolttyAI/core @ZolttyAI/ml
+/zolt/train.py                      @ZolttyAI/core @ZolttyAI/ml
+
+# Inference stack — requires infra review
+/zolt/inference/                    @ZolttyAI/core @ZolttyAI/infra
+
+# Data pipeline — requires data team review
+/zolt/data/                         @ZolttyAI/core @ZolttyAI/data
+
+# CI / release workflows — any workflow change needs core sign-off
+/.github/workflows/                 @ZolttyAI/core
+/.github/CODEOWNERS                 @ZolttyAI/core
+
+# Security-sensitive files
+/SECURITY.md                        @ZolttyAI/core
+/pyproject.toml                     @ZolttyAI/core
+
+# Docs — lighter review, any core member suffices
+/README.md                          @ZolttyAI/core
+/CONTRIBUTING.md                    @ZolttyAI/core
+/ARCHITECTURE.md                    @ZolttyAI/core
+/CHANGELOG.md                       @ZolttyAI/core

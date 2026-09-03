@@ -1,0 +1,87 @@
+name: "✨ Feature Request"
+description: "Propose a new capability or improvement to Zolt."
+title: "feat: <short description>"
+labels: ["enhancement", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping make Zolt better!
+        Before submitting, please search existing issues and discussions to avoid duplicates.
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: "Motivation"
+      description: |
+        Why is this feature needed? What problem does it solve?
+        Include links to papers, external implementations, or prior art if relevant.
+      placeholder: |
+        Currently, `ZoltGenerator` does not support beam search decoding.
+        Greedy decoding produces repetitive outputs for longer sequences, and...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: "Proposed Solution"
+      description: "Describe the solution you'd like. Include a proposed API if applicable."
+      render: python
+      placeholder: |
+        # Proposed API
+        generator = ZoltGenerator("path/to/ckpt")
+        tokens = generator.generate(
+            prompt_ids,
+            strategy="beam",
+            num_beams=4,
+            length_penalty=1.2,
+        )
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Alternatives Considered"
+      description: "What other solutions or workarounds have you considered? Why are they insufficient?"
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: "Affected Area"
+      description: "Which part of the codebase would this change?"
+      multiple: true
+      options:
+        - "Model architecture (zolt/model.py)"
+        - "Training loop (zolt/train.py)"
+        - "Inference / Generation (zolt/inference/)"
+        - "Data pipeline (zolt/data/)"
+        - "Tokenizer (zolt/tokenizer/)"
+        - "Probes (zolt/probe/)"
+        - "Evaluation (zolt/eval.py)"
+        - "CI / tooling"
+        - "Documentation"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: willingness
+    attributes:
+      label: "Contribution"
+      description: "Are you willing to implement this feature?"
+      options:
+        - "Yes — I'd like to submit a PR"
+        - "Possibly — I could help with guidance"
+        - "No — I'm requesting it from the maintainers"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "Additional Context"
+      description: "Links to papers, benchmarks, related issues, or any other context."

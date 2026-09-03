@@ -1,0 +1,97 @@
+name: "🐛 Bug Report"
+description: "Report a reproducible bug or unexpected behavior in Zolt."
+title: "fix: <short description>"
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report a bug!
+        Please fill in as much detail as possible so we can reproduce and fix it quickly.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Describe the Bug"
+      description: "A clear and concise description of what the bug is."
+      placeholder: "When I call `ZoltForCausalLM.encode(...)` with `pool='last'`, the output tensor has shape..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: "Steps to Reproduce"
+      description: "Minimal code snippet or step-by-step instructions to reproduce the issue."
+      render: python
+      placeholder: |
+        from zolt import ZoltForCausalLM, ZoltConfig
+        import torch
+
+        config = ZoltConfig(dim=64, n_layers=2, n_heads=4, vocab_size=256)
+        model = ZoltForCausalLM(config)
+        ids = torch.randint(0, 256, (1, 16))
+        emb = model.encode(ids)
+        print(emb.shape)  # unexpected output here
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Expected Behavior"
+      description: "What did you expect to happen?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "Actual Behavior"
+      description: "What actually happened? Include full error messages and tracebacks."
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "Zolt Version / Commit"
+      description: "Run `python -c 'import zolt; print(zolt.__version__)'` or paste the commit SHA."
+      placeholder: "0.1.0 or abc1234"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: python
+    attributes:
+      label: "Python Version"
+      options:
+        - "3.12"
+        - "3.13"
+        - "3.14"
+        - "Other (specify in Additional Context)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: "Operating System"
+      options:
+        - "Linux (x86_64)"
+        - "Linux (arm64)"
+        - "macOS (Apple Silicon)"
+        - "macOS (Intel)"
+        - "Windows"
+        - "Other"
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: "Additional Context"
+      description: "Any other information that might be relevant (PyTorch version, hardware, etc.)."
