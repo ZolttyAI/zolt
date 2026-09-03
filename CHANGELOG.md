@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Repository renamed from `z1` → `zolt`; brand `zone.ai` → `zolt.ai`.
+- Repository renamed from `z1` → `zolt`; brand `zone.ai` → `ZolttyAI`.
 - All Python source files reformatted with `ruff format`.
 - `mix_datasets()` signature now includes explicit `seed: int = 42` parameter.
 - `extract_code_block` re-exported from `verify_ts` for backward compatibility.
