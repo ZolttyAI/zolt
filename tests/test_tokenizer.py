@@ -1,15 +1,16 @@
 """Unit tests for zolt tokenizer."""
+
 import os
 import tempfile
-
-import pytest
 
 from zolt.tokenizer.train_tokenizer import ZOLT_SPECIAL_TOKENS, get_code_iterator
 
 
 def test_special_tokens_count():
     """Verify that special tokens are uniquely defined."""
-    assert len(ZOLT_SPECIAL_TOKENS) == len(set(ZOLT_SPECIAL_TOKENS)), "Duplicate special tokens detected"
+    assert len(ZOLT_SPECIAL_TOKENS) == len(set(ZOLT_SPECIAL_TOKENS)), (
+        "Duplicate special tokens detected"
+    )
     assert "<think>" in ZOLT_SPECIAL_TOKENS
     assert "</think>" in ZOLT_SPECIAL_TOKENS
     assert "<tool_call>" in ZOLT_SPECIAL_TOKENS

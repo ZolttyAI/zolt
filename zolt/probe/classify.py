@@ -5,20 +5,18 @@ Supports a hybrid label set: a predefined default intent taxonomy plus
 user-configurable extensions. The backbone (ZoltForCausalLM) is always frozen;
 only the probe head is trained.
 """
+
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-
 # ── Predefined intent taxonomy ──────────────────────────────────────────────
 
-DEFAULT_INTENT_LABELS: List[str] = [
+DEFAULT_INTENT_LABELS: list[str] = [
     "code_generation",
     "code_review",
     "refactor",
@@ -29,7 +27,7 @@ DEFAULT_INTENT_LABELS: List[str] = [
     "documentation",
 ]
 
-DEFAULT_LANG_LABELS: List[str] = [
+DEFAULT_LANG_LABELS: list[str] = [
     "python",
     "typescript",
     "javascript",
@@ -39,15 +37,15 @@ DEFAULT_LANG_LABELS: List[str] = [
 
 
 def build_label_set(
-    predefined: List[str],
-    extra: Optional[List[str]] = None,
-) -> List[str]:
+    predefined: list[str],
+    extra: list[str] | None = None,
+) -> list[str]:
     """
     Merge a predefined label list with optional user-supplied extensions.
     Duplicates are removed while preserving order (predefined labels first).
     """
-    seen: Dict[str, int] = {}
-    result: List[str] = []
+    seen: dict[str, int] = {}
+    result: list[str] = []
     for label in predefined + (extra or []):
         if label not in seen:
             seen[label] = len(result)
@@ -56,6 +54,7 @@ def build_label_set(
 
 
 # ── Probe architectures ──────────────────────────────────────────────────────
+
 
 class LinearProbe(nn.Module):
     """Single linear classification head."""
@@ -93,6 +92,7 @@ class MLPProbe(nn.Module):
 
 # ── Public API ───────────────────────────────────────────────────────────────
 
+
 class ClassificationProbe:
     """
     Trainable classification probe over zolt hidden-state representations.
@@ -104,12 +104,12 @@ class ClassificationProbe:
     def __init__(
         self,
         input_dim: int,
-        predefined_labels: Optional[List[str]] = None,
-        extra_labels: Optional[List[str]] = None,
+        predefined_labels: list[str] | None = None,
+        extra_labels: list[str] | None = None,
         arch: str = "linear",
         hidden_dim: int = 256,
         dropout: float = 0.1,
-        device: Optional[torch.device] = None,
+        device: torch.device | None = None,
     ):
         """
         Args:
@@ -125,11 +125,12 @@ class ClassificationProbe:
             predefined_labels if predefined_labels is not None else DEFAULT_INTENT_LABELS,
             extra_labels,
         )
-        self.label2id: Dict[str, int] = {l: i for i, l in enumerate(self.labels)}
-        self.id2label: Dict[int, str] = {i: l for i, l in enumerate(self.labels)}
+        self.label2id: dict[str, int] = {lbl: i for i, lbl in enumerate(self.labels)}
+        self.id2label: dict[int, str] = dict(enumerate(self.labels))
         self.n_classes = len(self.labels)
         self.device = device or torch.device("cpu")
 
+        self.model: nn.Module
         if arch == "mlp":
             self.model = MLPProbe(input_dim, self.n_classes, hidden_dim, dropout)
         else:
@@ -139,20 +140,20 @@ class ClassificationProbe:
     def fit(
         self,
         embeddings: torch.Tensor,
-        labels: Union[List[str], List[int], torch.Tensor],
+        labels: list[str] | list[int] | torch.Tensor,
         n_epochs: int = 20,
         lr: float = 1e-3,
         weight_decay: float = 1e-4,
         batch_size: int = 64,
         verbose: bool = False,
-    ) -> List[float]:
+    ) -> list[float]:
         """
         Train the probe head on labeled embeddings.
         Returns per-epoch cross-entropy loss.
         """
         # Encode string labels
         if isinstance(labels, list) and labels and isinstance(labels[0], str):
-            label_ids = torch.tensor([self.label2id[l] for l in labels], dtype=torch.long)
+            label_ids = torch.tensor([self.label2id[lbl] for lbl in labels], dtype=torch.long)
         elif isinstance(labels, torch.Tensor):
             label_ids = labels.long()
         else:
@@ -190,7 +191,7 @@ class ClassificationProbe:
         return losses
 
     @torch.no_grad()
-    def predict(self, embeddings: torch.Tensor) -> List[str]:
+    def predict(self, embeddings: torch.Tensor) -> list[str]:
         """Return predicted label strings for a batch of embeddings."""
         self.model.eval()
         logits = self.model(embeddings.to(self.device))
@@ -205,7 +206,7 @@ class ClassificationProbe:
         return F.softmax(logits, dim=-1)
 
     @torch.no_grad()
-    def accuracy(self, embeddings: torch.Tensor, labels: Union[List[str], torch.Tensor]) -> float:
+    def accuracy(self, embeddings: torch.Tensor, labels: list[str] | torch.Tensor) -> float:
         """Compute accuracy on a labeled evaluation set."""
         preds = self.predict(embeddings)
         if isinstance(labels, torch.Tensor):
@@ -215,7 +216,7 @@ class ClassificationProbe:
         correct = sum(p == t for p, t in zip(preds, truth))
         return correct / max(len(truth), 1)
 
-    def save(self, path: Union[str, Path]) -> None:
+    def save(self, path: str | Path) -> None:
         """Serialize probe weights and label map to disk."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -229,7 +230,9 @@ class ClassificationProbe:
         )
 
     @classmethod
-    def load(cls, path: Union[str, Path], input_dim: int, device: Optional[torch.device] = None) -> "ClassificationProbe":
+    def load(
+        cls, path: str | Path, input_dim: int, device: torch.device | None = None
+    ) -> ClassificationProbe:
         """Load a previously saved probe from disk."""
         data = torch.load(path, map_location="cpu")
         arch = "mlp" if data["arch"] == "MLPProbe" else "linear"

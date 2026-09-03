@@ -6,19 +6,18 @@ Optional stricter pass: mypy when installed.
 Python is always available in this environment, so there is no "no checker" case.
 The result distinguishes syntax-only from mypy-augmented checks via the `checker` field.
 """
+
 import ast
+import os
 import shutil
 import subprocess
 import tempfile
-import os
-from typing import Any, Dict, Optional
+from typing import Any
 
 from zolt.inference.verify_base import (
     VerifyResult,
-    extract_code_block,
     self_correcting_generate,
 )
-
 
 _SYSTEM_PROMPT = "You are an expert Python engineer. Write valid, idiomatic Python 3 code."
 
@@ -31,7 +30,9 @@ def _check_python(py_code: str, timeout: int = 10) -> VerifyResult:
     The checker field distinguishes 'ast' from 'mypy'.
     """
     if not py_code or not py_code.strip():
-        return VerifyResult(valid=False, verified=False, error="Empty Python code snippet.", checker="none")
+        return VerifyResult(
+            valid=False, verified=False, error="Empty Python code snippet.", checker="none"
+        )
 
     # Syntax check via ast.parse (no subprocess, no failure possible due to missing tool)
     try:
@@ -39,7 +40,7 @@ def _check_python(py_code: str, timeout: int = 10) -> VerifyResult:
     except SyntaxError as e:
         return VerifyResult(
             valid=False,
-            verified=True,   # ast.parse is real, the check itself ran
+            verified=True,  # ast.parse is real, the check itself ran
             heuristic=False,
             error=f"SyntaxError: {e}",
             checker="ast",
@@ -55,14 +56,14 @@ def _check_python(py_code: str, timeout: int = 10) -> VerifyResult:
     # Syntax-only verified pass
     return VerifyResult(
         valid=True,
-        verified=True,   # ast.parse ran successfully
+        verified=True,  # ast.parse ran successfully
         heuristic=False,
         error=None,
         checker="ast",
     )
 
 
-def _run_mypy(mypy_path: str, py_code: str, timeout: int) -> Optional[VerifyResult]:
+def _run_mypy(mypy_path: str, py_code: str, timeout: int) -> VerifyResult | None:
     """
     Run mypy on a temporary file. Returns None on unexpected subprocess errors.
     Returns VerifyResult with checker='mypy' on success or failure.
@@ -75,15 +76,18 @@ def _run_mypy(mypy_path: str, py_code: str, timeout: int) -> Optional[VerifyResu
         try:
             proc = subprocess.run(
                 [mypy_path, "--ignore-missing-imports", "--no-error-summary", file_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
                 timeout=timeout,
             )
             if proc.returncode == 0:
-                return VerifyResult(valid=True, verified=True, heuristic=False, error=None, checker="mypy")
+                return VerifyResult(
+                    valid=True, verified=True, heuristic=False, error=None, checker="mypy"
+                )
             err_msg = (proc.stdout + "\n" + proc.stderr).strip()
-            return VerifyResult(valid=False, verified=True, heuristic=False, error=err_msg, checker="mypy")
+            return VerifyResult(
+                valid=False, verified=True, heuristic=False, error=err_msg, checker="mypy"
+            )
         except subprocess.TimeoutExpired:
             return VerifyResult(
                 valid=False,
@@ -97,7 +101,7 @@ def _run_mypy(mypy_path: str, py_code: str, timeout: int) -> Optional[VerifyResu
             return None
 
 
-def verify_python_code(py_code: str) -> Dict[str, Any]:
+def verify_python_code(py_code: str) -> dict[str, Any]:
     """
     Verify Python code. Returns {valid, verified, heuristic, error, checker}.
     verified=True always (Python always available); checker distinguishes 'ast' vs 'mypy'.
@@ -112,7 +116,7 @@ def self_correcting_generate_python(
     temperature: float = 0.5,
     top_p: float = 0.9,
     system_prompt: str = _SYSTEM_PROMPT,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Generate Python with self-verification and correction loop.
     Returns {code, verified, heuristic, attempts, error, checker}.

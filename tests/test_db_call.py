@@ -1,12 +1,11 @@
 """Unit tests for structured restricted database calls."""
-import pytest
-from zolt.inference.db_call import (
-    validate_db_call,
-    parse_db_calls,
-    format_db_call,
-    SUPPORTED_DIALECTS,
-)
+
 from zolt.data.db_call_synth import generate_db_call_examples
+from zolt.inference.db_call import (
+    SUPPORTED_DIALECTS,
+    parse_db_calls,
+    validate_db_call,
+)
 
 
 def test_validate_db_call_supported_dialects():

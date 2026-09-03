@@ -1,0 +1,139 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 3 * * 0"   # Weekly on Sundays at 03:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  # ─── Debug train loop (tiny config, CPU) ─────────────────────────────────
+  debug-train:
+    name: Debug train loop (CPU)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          uv pip install torch --index-url https://download.pytorch.org/whl/cpu --system
+          uv pip install tokenizers datasets einops tqdm --system
+          uv pip install -e . --system
+
+      - name: Run debug train
+        id: train
+        run: |
+          python scripts/debug_train.py 2>&1 | tee train.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload train log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-train-log
+          path: train.log
+          retention-days: 14
+
+      - name: Create issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const log = fs.existsSync('train.log') ? fs.readFileSync('train.log', 'utf8').slice(-3000) : '(log unavailable)';
+            const date = new Date().toISOString().split('T')[0];
+
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'nightly,training,automated',
+              state: 'open',
+            });
+
+            const body = [
+              `## 🌙 Nightly train loop failure — ${date}`,
+              '',
+              `The weekly debug train loop failed. [View run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              '',
+              '### Last 3000 chars of train log',
+              '```',
+              log,
+              '```',
+            ].join('\n');
+
+            if (issues.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues.data[0].number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `🌙 Nightly train loop failure — ${date}`,
+                body,
+                labels: ['nightly', 'training', 'automated'],
+              });
+            }
+
+  # ─── Full test suite (sanity) ────────────────────────────────────────────
+  nightly-tests:
+    name: Full test suite (nightly)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: pyproject.toml
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          uv pip install torch --index-url https://download.pytorch.org/whl/cpu --system
+          uv pip install tokenizers datasets einops tqdm pytest pytest-cov --system
+          uv pip install -e . --system
+
+      - name: Install TypeScript compiler
+        run: npm install --global typescript
+
+      - name: Run full test suite
+        run: pytest tests/ -v --tb=long
+
+      - name: Create issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const date = new Date().toISOString().split('T')[0];
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🌙 Nightly test failure — ${date}`,
+              body: `The nightly full test suite failed.\n\n[View run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              labels: ['nightly', 'tests', 'automated'],
+            });

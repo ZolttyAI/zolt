@@ -2,10 +2,9 @@
 RoPE context extension via Linear and NTK-aware scaling.
 Updates precomputed cos/sin buffers in checkpoint configs without full retraining.
 """
+
 import json
-import math
 from pathlib import Path
-from typing import Optional
 
 import torch
 
@@ -18,15 +17,15 @@ def apply_rope_scaling_to_checkpoint(
     output_path: str,
     target_seq_len: int = 16384,
     scaling_type: str = "ntk",
-    scaling_factor: Optional[float] = None,
+    scaling_factor: float | None = None,
 ):
     """Load a short-context checkpoint and apply RoPE scaling up to target_seq_len."""
-    checkpoint_path = Path(checkpoint_path)
-    output_path = Path(output_path)
-    output_path.mkdir(parents=True, exist_ok=True)
+    ckpt_path = Path(checkpoint_path)
+    out_path = Path(output_path)
+    out_path.mkdir(parents=True, exist_ok=True)
 
     # Load config
-    with open(checkpoint_path / "config.json") as f:
+    with open(ckpt_path / "config.json") as f:
         config_dict = json.load(f)
 
     original_seq_len = config_dict["max_seq_len"]
@@ -47,7 +46,7 @@ def apply_rope_scaling_to_checkpoint(
     # Load model state dict
     device = torch.device("cpu")
     model = ZoltForCausalLM(config)
-    state_dict = torch.load(checkpoint_path / "model.pt", map_location=device)
+    state_dict = torch.load(ckpt_path / "model.pt", map_location=device)
     model.load_state_dict(state_dict, strict=False)
 
     # Recompute RoPE buffers with target scaling
@@ -64,11 +63,11 @@ def apply_rope_scaling_to_checkpoint(
     model.model.register_buffer("sin", sin, persistent=False)
 
     # Save updated checkpoint
-    torch.save(model.state_dict(), output_path / "model.pt")
-    with open(output_path / "config.json", "w") as f:
+    torch.save(model.state_dict(), out_path / "model.pt")
+    with open(out_path / "config.json", "w") as f:
         json.dump(config_dict, f, indent=2)
 
-    print(f"[zolt-rope] Saved context-extended model ({target_seq_len}) to: {output_path}")
+    print(f"[zolt-rope] Saved context-extended model ({target_seq_len}) to: {out_path}")
 
 
 def ntk_scaling_factor(original_len: int, target_len: int, dim: int) -> float:

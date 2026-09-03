@@ -2,13 +2,14 @@
 Tests for verify_js.py: valid syntax, invalid syntax, code extraction,
 retry loop success/exhausted, and tool-absent fallback (verified=False).
 """
+
 import unittest.mock as mock
-import pytest
-from zolt.inference.verify_js import (
-    verify_javascript_code,
-    self_correcting_generate_js,
-)
+
 from zolt.inference.verify_base import extract_code_block
+from zolt.inference.verify_js import (
+    self_correcting_generate_js,
+    verify_javascript_code,
+)
 
 
 class MockGenerator:
@@ -26,12 +27,7 @@ class MockGenerator:
 
 
 def test_verify_javascript_valid_syntax():
-    code = (
-        "function greet(name) {\n"
-        "  return 'Hello, ' + name;\n"
-        "}\n"
-        "const result = greet('world');\n"
-    )
+    code = "function greet(name) {\n  return 'Hello, ' + name;\n}\nconst result = greet('world');\n"
     res = verify_javascript_code(code)
     assert res["valid"]
 

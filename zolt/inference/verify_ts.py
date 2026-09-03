@@ -4,11 +4,12 @@ TypeScript self-verification and self-correction loop.
 Primary checker: tsc --noEmit.
 Fallback: zolt.eval bracket/string-balance heuristic (marked as heuristic, verified=False).
 """
+
 import os
 import shutil
-import tempfile
 import subprocess
-from typing import Any, Dict, Optional
+import tempfile
+from typing import Any
 
 from zolt.eval import check_javascript_syntax_heuristic
 from zolt.inference.verify_base import (
@@ -17,11 +18,17 @@ from zolt.inference.verify_base import (
     self_correcting_generate,
 )
 
+__all__ = [
+    "extract_code_block",
+    "run_tsc_check",
+    "self_correcting_generate_ts",
+    "verify_typescript_code",
+]
 
 _SYSTEM_PROMPT = "You are an expert TypeScript engineer. Write valid, type-safe TypeScript code."
 
 
-def run_tsc_check(ts_code: str, timeout: int = 10) -> Dict[str, Any]:
+def run_tsc_check(ts_code: str, timeout: int = 10) -> dict[str, Any]:
     """
     Run tsc --noEmit against a temporary file.
     Falls back to the zolt.eval heuristic when tsc is not installed.
@@ -37,7 +44,9 @@ def _check_typescript(ts_code: str, timeout: int = 10) -> VerifyResult:
     verified=True only when tsc actually ran and passed.
     """
     if not ts_code or not ts_code.strip():
-        return VerifyResult(valid=False, verified=False, error="Empty TypeScript code snippet.", checker="none")
+        return VerifyResult(
+            valid=False, verified=False, error="Empty TypeScript code snippet.", checker="none"
+        )
 
     # Fast heuristic pre-check (bracket balance, string balance)
     heuristic = check_javascript_syntax_heuristic(ts_code)
@@ -69,13 +78,14 @@ def _check_typescript(ts_code: str, timeout: int = 10) -> VerifyResult:
         try:
             proc = subprocess.run(
                 [tsc_path, "--noEmit", "--target", "ES2022", "--skipLibCheck", file_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
                 timeout=timeout,
             )
             if proc.returncode == 0:
-                return VerifyResult(valid=True, verified=True, heuristic=False, error=None, checker="tsc")
+                return VerifyResult(
+                    valid=True, verified=True, heuristic=False, error=None, checker="tsc"
+                )
             err_msg = (proc.stdout + "\n" + proc.stderr).strip()
             return VerifyResult(valid=False, verified=False, error=err_msg, checker="tsc")
         except subprocess.TimeoutExpired:
@@ -89,7 +99,7 @@ def _check_typescript(ts_code: str, timeout: int = 10) -> VerifyResult:
             return VerifyResult(valid=False, verified=False, error=str(e), checker="tsc")
 
 
-def verify_typescript_code(ts_code: str) -> Dict[str, Any]:
+def verify_typescript_code(ts_code: str) -> dict[str, Any]:
     """
     Verify TypeScript code. Returns {valid, verified, heuristic, error, checker}.
     verified=True only when tsc ran and passed.
@@ -105,7 +115,7 @@ def self_correcting_generate_ts(
     temperature: float = 0.5,
     top_p: float = 0.9,
     system_prompt: str = _SYSTEM_PROMPT,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Generate TypeScript with self-verification and correction loop.
     Returns {code, verified, heuristic, attempts, error, checker}.

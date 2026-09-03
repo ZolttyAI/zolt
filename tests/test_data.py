@@ -1,21 +1,31 @@
 """Unit tests for zolt data pipeline."""
+
 import json
 import os
 import tempfile
 
-import pytest
-
+from zolt.data.curriculum import (
+    estimate_code_complexity,
+    estimate_token_sequence_complexity,
+    sort_by_curriculum,
+)
+from zolt.data.dataset import PackedSequenceDataset
+from zolt.data.distill import generate_synthetic_instance, mix_datasets
 from zolt.data.filter_code import (
+    compute_textbook_quality_score,
+    content_hash,
+    filter_jsonl_file,
     is_permissive_license,
     is_target_language,
     passes_quality_heuristics,
-    content_hash,
-    filter_jsonl_file,
+    score_anti_patterns,
+    score_comments_and_docstrings,
+    score_complexity_readability,
+    score_test_presence,
 )
-from zolt.data.dataset import PackedSequenceDataset
-
 
 # --- filter_code Tests ---
+
 
 def test_permissive_license_accept():
     assert is_permissive_license("MIT")
@@ -69,10 +79,22 @@ def test_content_hash_different():
 def test_filter_jsonl_file():
     records = [
         {"content": "def foo():\n    return 42\n" * 10, "lang": "python", "license": "mit"},
-        {"content": "import java.util.List;", "lang": "java", "license": "mit"},  # reject: wrong lang
-        {"content": "const x = 1;", "lang": "javascript", "license": "GPL-3.0"},  # reject: non-permissive license
+        {
+            "content": "import java.util.List;",
+            "lang": "java",
+            "license": "mit",
+        },  # reject: wrong lang
+        {
+            "content": "const x = 1;",
+            "lang": "javascript",
+            "license": "GPL-3.0",
+        },  # reject: non-permissive license
         {"content": "   ", "lang": "python", "license": "mit"},  # reject: quality heuristic
-        {"content": "def foo():\n    return 42\n" * 10, "lang": "python", "license": "mit"},  # reject: duplicate content
+        {
+            "content": "def foo():\n    return 42\n" * 10,
+            "lang": "python",
+            "license": "mit",
+        },  # reject: duplicate content
     ]
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as fin:
@@ -96,28 +118,14 @@ def test_filter_jsonl_file():
 
 # --- Textbook Quality Score Heuristic Tests ---
 
-from zolt.data.filter_code import (
-    score_comments_and_docstrings,
-    score_test_presence,
-    score_anti_patterns,
-    score_complexity_readability,
-    compute_textbook_quality_score,
-)
-from zolt.data.curriculum import (
-    estimate_code_complexity,
-    estimate_token_sequence_complexity,
-    sort_by_curriculum,
-)
-from zolt.data.distill import generate_synthetic_instance, mix_datasets
-
 
 def test_score_comments_and_docstrings():
     well_documented = (
         '"""Module for calculation."""\n'
-        '# Helper function for addition\n'
-        'def add(a: int, b: int) -> int:\n'
+        "# Helper function for addition\n"
+        "def add(a: int, b: int) -> int:\n"
         '    """Return sum of two integers."""\n'
-        '    return a + b\n'
+        "    return a + b\n"
     )
     undocumented = "def add(a, b):\n    return a + b\n" * 10
     score_high = score_comments_and_docstrings(well_documented, "python")
@@ -144,10 +152,7 @@ def test_score_anti_patterns():
 
 def test_score_complexity_readability():
     clean_structured = (
-        "def process(items):\n"
-        "    for x in items:\n"
-        "        if x > 0:\n"
-        "            yield x * 2\n"
+        "def process(items):\n    for x in items:\n        if x > 0:\n            yield x * 2\n"
     )
     score = score_complexity_readability(clean_structured, "python")
     assert 0.5 <= score <= 1.0
@@ -156,12 +161,12 @@ def test_score_complexity_readability():
 def test_compute_textbook_quality_score():
     high_quality = (
         '"""High quality module."""\n'
-        '# Documented algorithm\n'
-        'def compute(x: int) -> int:\n'
+        "# Documented algorithm\n"
+        "def compute(x: int) -> int:\n"
         '    """Compute square if positive."""\n'
-        '    if x > 0:\n'
-        '        return x * x\n'
-        '    return 0\n'
+        "    if x > 0:\n"
+        "        return x * x\n"
+        "    return 0\n"
     )
     score = compute_textbook_quality_score(high_quality, "python", "tests/test_compute.py")
     assert score >= 0.70
@@ -173,12 +178,12 @@ def test_filter_jsonl_with_min_quality_score():
         {
             "content": (
                 '"""Math service."""\n'
-                '# Pure function\n'
-                'def add(a: int, b: int) -> int:\n'
+                "# Pure function\n"
+                "def add(a: int, b: int) -> int:\n"
                 '    """Add two numbers."""\n'
-                '    if a > 0 and b > 0:\n'
-                '        return a + b\n'
-                '    return 0\n'
+                "    if a > 0 and b > 0:\n"
+                "        return a + b\n"
+                "    return 0\n"
             ),
             "lang": "python",
             "license": "mit",
@@ -211,8 +216,11 @@ def test_filter_jsonl_with_min_quality_score():
 
 # --- Teacher Distillation Tests ---
 
+
 def test_distill_data_format_compatible():
-    instance = generate_synthetic_instance(None, {"lang": "python", "topic": "graphs"}, mock_mode=True)
+    instance = generate_synthetic_instance(
+        None, {"lang": "python", "topic": "graphs"}, mock_mode=True
+    )
     assert "content" in instance
     assert "lang" in instance
     assert "license" in instance
@@ -222,7 +230,9 @@ def test_distill_data_format_compatible():
 
 def test_mix_datasets_ratio():
     corpus = [{"content": f"code_{i}", "lang": "python", "license": "mit"} for i in range(80)]
-    distilled = [{"content": f"distill_{i}", "lang": "python", "license": "synthetic"} for i in range(20)]
+    distilled = [
+        {"content": f"distill_{i}", "lang": "python", "license": "synthetic"} for i in range(20)
+    ]
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as fc:
         for r in corpus:
@@ -247,6 +257,7 @@ def test_mix_datasets_ratio():
 
 
 # --- Curriculum Learning Tests ---
+
 
 def test_curriculum_complexity_scoring():
     simple_code = "x = 1"
@@ -288,9 +299,11 @@ def test_packed_dataset_curriculum_ordering():
 
 # --- PackedSequenceDataset Tests ---
 
+
 def test_packed_dataset_basic():
     """Verify that PackedSequenceDataset produces properly shaped batches."""
     import tempfile
+
     import numpy as np
 
     tokens = list(range(1, 5001))  # 5000 sequential tokens

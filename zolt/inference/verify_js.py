@@ -5,19 +5,18 @@ Primary checker: node --check <file>.
 Optional richer errors: eslint --no-eslintrc --rule 'no-undef: error' when eslint is present.
 Fallback: zolt.eval bracket/string-balance heuristic (verified=False, heuristic=True).
 """
+
 import os
 import shutil
-import tempfile
 import subprocess
-from typing import Any, Dict, Optional
+import tempfile
+from typing import Any
 
 from zolt.eval import check_javascript_syntax_heuristic
 from zolt.inference.verify_base import (
     VerifyResult,
-    extract_code_block,
     self_correcting_generate,
 )
-
 
 _SYSTEM_PROMPT = "You are an expert JavaScript engineer. Write valid, modern JavaScript code."
 
@@ -28,7 +27,9 @@ def _check_javascript(js_code: str, timeout: int = 10) -> VerifyResult:
     verified=True only when node --check or eslint actually ran and passed.
     """
     if not js_code or not js_code.strip():
-        return VerifyResult(valid=False, verified=False, error="Empty JavaScript code snippet.", checker="none")
+        return VerifyResult(
+            valid=False, verified=False, error="Empty JavaScript code snippet.", checker="none"
+        )
 
     # Fast heuristic pre-check
     heuristic = check_javascript_syntax_heuristic(js_code)
@@ -73,22 +74,28 @@ def _run_node_check(node_path: str, file_path: str, timeout: int) -> VerifyResul
     try:
         proc = subprocess.run(
             [node_path, "--check", file_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=timeout,
         )
         if proc.returncode == 0:
-            return VerifyResult(valid=True, verified=True, heuristic=False, error=None, checker="node")
+            return VerifyResult(
+                valid=True, verified=True, heuristic=False, error=None, checker="node"
+            )
         err_msg = (proc.stdout + "\n" + proc.stderr).strip()
         return VerifyResult(valid=False, verified=False, error=err_msg, checker="node")
     except subprocess.TimeoutExpired:
-        return VerifyResult(valid=False, verified=False, error=f"node --check timed out after {timeout}s", checker="node")
+        return VerifyResult(
+            valid=False,
+            verified=False,
+            error=f"node --check timed out after {timeout}s",
+            checker="node",
+        )
     except Exception as e:
         return VerifyResult(valid=False, verified=False, error=str(e), checker="node")
 
 
-def _run_eslint(eslint_path: str, file_path: str, timeout: int) -> Optional[VerifyResult]:
+def _run_eslint(eslint_path: str, file_path: str, timeout: int) -> VerifyResult | None:
     """
     Run eslint with minimal config for syntax checking.
     Returns None if eslint errors out unexpectedly (caller falls back to node --check).
@@ -96,23 +103,29 @@ def _run_eslint(eslint_path: str, file_path: str, timeout: int) -> Optional[Veri
     try:
         proc = subprocess.run(
             [eslint_path, "--no-eslintrc", "--env", "es2022", file_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=timeout,
         )
         if proc.returncode == 0:
-            return VerifyResult(valid=True, verified=True, heuristic=False, error=None, checker="eslint")
+            return VerifyResult(
+                valid=True, verified=True, heuristic=False, error=None, checker="eslint"
+            )
         err_msg = (proc.stdout + "\n" + proc.stderr).strip()
         return VerifyResult(valid=False, verified=False, error=err_msg, checker="eslint")
     except subprocess.TimeoutExpired:
-        return VerifyResult(valid=False, verified=False, error=f"eslint timed out after {timeout}s", checker="eslint")
+        return VerifyResult(
+            valid=False,
+            verified=False,
+            error=f"eslint timed out after {timeout}s",
+            checker="eslint",
+        )
     except Exception:
         # Unexpected eslint failure: fall back to node --check
         return None
 
 
-def verify_javascript_code(js_code: str) -> Dict[str, Any]:
+def verify_javascript_code(js_code: str) -> dict[str, Any]:
     """
     Verify JavaScript code. Returns {valid, verified, heuristic, error, checker}.
     verified=True only when node or eslint ran and passed.
@@ -127,7 +140,7 @@ def self_correcting_generate_js(
     temperature: float = 0.5,
     top_p: float = 0.9,
     system_prompt: str = _SYSTEM_PROMPT,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Generate JavaScript with self-verification and correction loop.
     Returns {code, verified, heuristic, attempts, error, checker}.

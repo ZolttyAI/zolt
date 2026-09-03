@@ -1,15 +1,15 @@
 """
 zolt evaluation: loss, perplexity, code syntax validation, and reasoning tag balance.
 """
+
 import ast
 import json
 import math
-import re
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Tuple
+import re
+from typing import Any
 
 import torch
-import torch.nn.functional as F
 
 from zolt.config import ZoltConfig
 from zolt.model import ZoltForCausalLM
@@ -17,10 +17,10 @@ from zolt.model import ZoltForCausalLM
 
 def compute_perplexity(
     model: ZoltForCausalLM,
-    token_sequences: List[List[int]],
+    token_sequences: list[list[int]],
     device: torch.device,
     max_seq_len: int = 4096,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Compute average cross-entropy loss and perplexity across token sequences."""
     model.eval()
     total_loss = 0.0
@@ -31,13 +31,13 @@ def compute_perplexity(
             if len(seq) < 2:
                 continue
 
-            seq = seq[:max_seq_len + 1]
+            seq = seq[: max_seq_len + 1]
             input_ids = torch.tensor([seq[:-1]], dtype=torch.long, device=device)
             labels = torch.tensor([seq[1:]], dtype=torch.long, device=device)
 
             _, loss = model(input_ids, labels=labels)
             if loss is not None:
-                n_tokens = (labels != -100).sum().item()
+                n_tokens = int((labels != -100).sum().item())
                 total_loss += loss.item() * n_tokens
                 total_tokens += n_tokens
 
@@ -46,7 +46,7 @@ def compute_perplexity(
     return avg_loss, ppl
 
 
-def check_python_syntax(code: str) -> Dict[str, Any]:
+def check_python_syntax(code: str) -> dict[str, Any]:
     """Validate Python syntax with ast.parse."""
     try:
         ast.parse(code)
@@ -55,7 +55,7 @@ def check_python_syntax(code: str) -> Dict[str, Any]:
         return {"valid": False, "error": str(e)}
 
 
-def check_javascript_syntax_heuristic(code: str) -> Dict[str, Any]:
+def check_javascript_syntax_heuristic(code: str) -> dict[str, Any]:
     """Heuristic bracket and string balance check for JS/TS code snippets."""
     stack = []
     pairs = {")": "(", "}": "{", "]": "["}
@@ -88,7 +88,7 @@ def check_javascript_syntax_heuristic(code: str) -> Dict[str, Any]:
     return {"valid": True, "error": None}
 
 
-def check_reasoning_tags(text: str) -> Dict[str, Any]:
+def check_reasoning_tags(text: str) -> dict[str, Any]:
     """Verify that reasoning and tool call tags are balanced."""
     tag_pairs = [
         ("<think>", "</think>"),
@@ -109,23 +109,23 @@ def check_reasoning_tags(text: str) -> Dict[str, Any]:
 
 def evaluate_checkpoint(
     checkpoint_dir: str,
-    eval_sequences: List[List[int]],
-    code_samples_python: Optional[List[str]] = None,
-    code_samples_js: Optional[List[str]] = None,
-    reasoning_samples: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+    eval_sequences: list[list[int]],
+    code_samples_python: list[str] | None = None,
+    code_samples_js: list[str] | None = None,
+    reasoning_samples: list[str] | None = None,
+) -> dict[str, Any]:
     """Evaluate checkpoint on perplexity, code syntax, and tag validity."""
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    checkpoint_dir = Path(checkpoint_dir)
-    with open(checkpoint_dir / "config.json") as f:
+    ckpt_dir = Path(checkpoint_dir)
+    with open(ckpt_dir / "config.json") as f:
         config_dict = json.load(f)
 
     config = ZoltConfig(**config_dict)
     model = ZoltForCausalLM(config).to(device)
-    model.load_state_dict(torch.load(checkpoint_dir / "model.pt", map_location=device))
+    model.load_state_dict(torch.load(ckpt_dir / "model.pt", map_location=device))
 
-    results: Dict[str, Any] = {}
+    results: dict[str, Any] = {}
 
     # ─── Perplexity ─────────────────────────────────────────────────────────
     avg_loss, ppl = compute_perplexity(model, eval_sequences, device, config.max_seq_len)
@@ -138,21 +138,27 @@ def evaluate_checkpoint(
         py_results = [check_python_syntax(c) for c in code_samples_python]
         py_valid = sum(r["valid"] for r in py_results)
         results["python_syntax_pass_rate"] = py_valid / len(py_results)
-        print(f"[zolt-eval] Python Syntax: {py_valid}/{len(py_results)} valid ({results['python_syntax_pass_rate']:.1%})")
+        print(
+            f"[zolt-eval] Python Syntax: {py_valid}/{len(py_results)} valid ({results['python_syntax_pass_rate']:.1%})"
+        )
 
     # ─── JS Syntax ──────────────────────────────────────────────────────────
     if code_samples_js:
         js_results = [check_javascript_syntax_heuristic(c) for c in code_samples_js]
         js_valid = sum(r["valid"] for r in js_results)
         results["js_syntax_pass_rate"] = js_valid / len(js_results)
-        print(f"[zolt-eval] JS Syntax: {js_valid}/{len(js_results)} valid ({results['js_syntax_pass_rate']:.1%})")
+        print(
+            f"[zolt-eval] JS Syntax: {js_valid}/{len(js_results)} valid ({results['js_syntax_pass_rate']:.1%})"
+        )
 
     # ─── Reasoning Tags ─────────────────────────────────────────────────────
     if reasoning_samples:
         tag_results = [check_reasoning_tags(s) for s in reasoning_samples]
         tags_valid = sum(r["valid"] for r in tag_results)
         results["reasoning_tag_pass_rate"] = tags_valid / len(tag_results)
-        print(f"[zolt-eval] Reasoning Tags: {tags_valid}/{len(tag_results)} valid ({results['reasoning_tag_pass_rate']:.1%})")
+        print(
+            f"[zolt-eval] Reasoning Tags: {tags_valid}/{len(tag_results)} valid ({results['reasoning_tag_pass_rate']:.1%})"
+        )
 
     return results
 

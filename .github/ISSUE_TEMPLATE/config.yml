@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: "💬 Discussions (Q&A, ideas, show & tell)"
+    url: https://github.com/ZolttyAI/zolt/discussions
+    about: >
+      For questions, general discussion, or ideas that are not yet
+      a concrete bug or feature request, please use Discussions.
+
+  - name: "🔒 Security Vulnerability"
+    url: https://github.com/ZolttyAI/zolt/security/advisories/new
+    about: >
+      For security vulnerabilities, please use GitHub's private
+      Security Advisory feature — do NOT open a public issue.

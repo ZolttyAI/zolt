@@ -1,22 +1,19 @@
 """Tests for grid_search and random_search."""
-import json
-import tempfile
-from pathlib import Path
 
-import pytest
+from pathlib import Path
+import random
+import tempfile
 
 from zolt.optimize.search import (
-    Trial,
     SearchResult,
-    grid_search,
-    random_search,
     _grid_combinations,
     _sample_params,
+    grid_search,
+    random_search,
 )
-import random
-
 
 # ── SearchResult ──────────────────────────────────────────────────────────────
+
 
 def test_search_result_minimize_best():
     sr = SearchResult(direction="minimize")
@@ -62,6 +59,7 @@ def test_search_result_save_load_roundtrip():
 
 # ── Grid combinations ─────────────────────────────────────────────────────────
 
+
 def test_grid_combinations_cartesian():
     grid = {"lr": [0.1, 0.01], "wd": [0.0, 1e-4]}
     combos = list(_grid_combinations(grid))
@@ -77,8 +75,11 @@ def test_grid_combinations_single_param():
 
 # ── Grid search ───────────────────────────────────────────────────────────────
 
+
 def test_grid_search_finds_minimum():
-    eval_fn = lambda p: abs(p["x"] - 3.0)
+    def eval_fn(p):
+        return abs(p["x"] - 3.0)
+
     grid = {"x": [0.0, 1.0, 2.0, 3.0, 4.0]}
     result = grid_search(eval_fn, grid, direction="minimize")
     assert result.best.params["x"] == 3.0
@@ -87,9 +88,11 @@ def test_grid_search_finds_minimum():
 
 def test_grid_search_evaluates_all_combinations():
     calls = []
+
     def eval_fn(p):
         calls.append(p)
         return 1.0
+
     grid = {"a": [1, 2], "b": [10, 20]}
     grid_search(eval_fn, grid)
     assert len(calls) == 4
@@ -100,6 +103,7 @@ def test_grid_search_handles_eval_exception():
         if p["x"] == 2:
             raise RuntimeError("oops")
         return float(p["x"])
+
     result = grid_search(bad_fn, {"x": [1, 2, 3]}, direction="minimize")
     # x=2 should be recorded with an error; best should be x=1 (score=1.0)
     errored = [t for t in result.trials if t.error is not None]
@@ -109,18 +113,23 @@ def test_grid_search_handles_eval_exception():
 
 # ── Random search ─────────────────────────────────────────────────────────────
 
+
 def test_random_search_n_trials():
     calls = []
+
     def eval_fn(p):
         calls.append(p)
         return p["lr"]
+
     space = {"lr": (0.0, 1.0, float)}
     random_search(eval_fn, space, n_trials=15, seed=0)
     assert len(calls) == 15
 
 
 def test_random_search_reproducible():
-    eval_fn = lambda p: p["lr"]
+    def eval_fn(p):
+        return p["lr"]
+
     space = {"lr": (0.0, 1.0, float)}
     r1 = random_search(eval_fn, space, n_trials=10, seed=99)
     r2 = random_search(eval_fn, space, n_trials=10, seed=99)
@@ -131,9 +140,11 @@ def test_random_search_reproducible():
 
 def test_random_search_int_param():
     values_seen = set()
+
     def eval_fn(p):
         values_seen.add(p["k"])
         return float(p["k"])
+
     space = {"k": (2, 8, int)}
     random_search(eval_fn, space, n_trials=20, seed=0)
     assert all(2 <= v <= 8 for v in values_seen)
@@ -141,7 +152,11 @@ def test_random_search_int_param():
 
 def test_random_search_list_param():
     seen = set()
-    eval_fn = lambda p: seen.add(p["arch"]) or 0.0
+
+    def eval_fn(p):
+        seen.add(p["arch"])
+        return 0.0
+
     space = {"arch": ["linear", "mlp"]}
     random_search(eval_fn, space, n_trials=30, seed=0)
     assert "linear" in seen and "mlp" in seen

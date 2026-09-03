@@ -1,15 +1,16 @@
 """Unit tests for zolt model architecture."""
+
 import pytest
 import torch
+
 from zolt.config import ZoltConfig
 from zolt.model import (
-    ZoltForCausalLM,
-    ZoltTransformer,
+    Attention,
     RMSNorm,
     SwiGLUFFN,
-    Attention,
+    ZoltForCausalLM,
+    ZoltTransformer,
     precompute_freqs_cis,
-    apply_rotary_emb,
 )
 
 
@@ -54,8 +55,11 @@ def test_rope_precompute(tiny_config):
 
 def test_rope_scaling_ntk(tiny_config):
     head_dim = tiny_config.dim // tiny_config.n_heads
-    cos, sin = precompute_freqs_cis(head_dim, tiny_config.max_seq_len, scaling_type="ntk", scaling_factor=4.0)
+    cos, sin = precompute_freqs_cis(
+        head_dim, tiny_config.max_seq_len, scaling_type="ntk", scaling_factor=4.0
+    )
     assert cos.shape == (tiny_config.max_seq_len, head_dim // 2)
+    assert sin.shape == (tiny_config.max_seq_len, head_dim // 2)
 
 
 def test_attention_forward(tiny_config):
@@ -110,8 +114,9 @@ def test_zolt_no_loss_without_labels(tiny_config):
 
 def test_zolt_weight_tying(tiny_config):
     model = ZoltForCausalLM(tiny_config)
-    assert model.lm_head.weight is model.model.tok_embeddings.weight, \
+    assert model.lm_head.weight is model.model.tok_embeddings.weight, (
         "lm_head and tok_embeddings must share weights"
+    )
 
 
 def test_zolt_generate(tiny_config):
@@ -142,7 +147,9 @@ def test_presets_parameter_counts():
     cfg_mini = ZoltConfig.preset("zolt-mini")
     m_mini = ZoltForCausalLM(cfg_mini)
     n_mini = sum(p.numel() for p in m_mini.parameters())
-    assert 100_000_000 <= n_mini <= 130_000_000, f"Expected ~125M (zolt-mini) preset, got {n_mini:,}"
+    assert 100_000_000 <= n_mini <= 130_000_000, (
+        f"Expected ~125M (zolt-mini) preset, got {n_mini:,}"
+    )
 
     cfg_zolt = ZoltConfig.preset("zolt")
     m_zolt = ZoltForCausalLM(cfg_zolt)
@@ -176,4 +183,6 @@ def test_encode_mean_vs_last_distinct(tiny_config):
     input_ids = torch.tensor([[1, 10, 20, 30]])
     enc_last = model.encode(input_ids, pool="last")
     enc_mean = model.encode(input_ids, pool="mean")
-    assert not torch.allclose(enc_last, enc_mean), "pool='last' and pool='mean' must produce distinct representations"
+    assert not torch.allclose(enc_last, enc_mean), (
+        "pool='last' and pool='mean' must produce distinct representations"
+    )

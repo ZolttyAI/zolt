@@ -4,37 +4,40 @@ Grid and random hyperparameter search.
 Dependency-free implementation operating over user-supplied eval functions.
 Supports: grid search, random search, result serialization to JSON.
 """
+
 from __future__ import annotations
 
-import json
-import math
-import random
+from collections.abc import Callable, Generator
+from dataclasses import asdict, dataclass, field
 import itertools
-from dataclasses import dataclass, field, asdict
+import json
 from pathlib import Path
-from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
+import random
+from typing import Any
 
 
 @dataclass
 class Trial:
     """Result of a single hyperparameter evaluation."""
-    params: Dict[str, Any]
+
+    params: dict[str, Any]
     score: float
     rank: int = 0
-    error: Optional[str] = None
+    error: str | None = None
 
 
 @dataclass
 class SearchResult:
     """Aggregated search results, sortable by score."""
-    trials: List[Trial] = field(default_factory=list)
-    best: Optional[Trial] = None
+
+    trials: list[Trial] = field(default_factory=list)
+    best: Trial | None = None
     direction: str = "minimize"
 
     def _is_better(self, a: float, b: float) -> bool:
         return a < b if self.direction == "minimize" else a > b
 
-    def add(self, params: Dict[str, Any], score: float, error: Optional[str] = None) -> None:
+    def add(self, params: dict[str, Any], score: float, error: str | None = None) -> None:
         trial = Trial(params=params, score=score, error=error)
         self.trials.append(trial)
         if self.best is None or self._is_better(score, self.best.score):
@@ -48,11 +51,11 @@ class SearchResult:
         for rank, t in enumerate(sorted_trials, 1):
             t.rank = rank
 
-    def top_k(self, k: int) -> List[Trial]:
+    def top_k(self, k: int) -> list[Trial]:
         """Return the k best trials sorted by rank."""
         return sorted(self.trials, key=lambda t: t.rank)[:k]
 
-    def save(self, path: Union[str, Path]) -> None:
+    def save(self, path: str | Path) -> None:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
         data = {
@@ -64,7 +67,7 @@ class SearchResult:
             json.dump(data, f, indent=2)
 
     @classmethod
-    def load(cls, path: Union[str, Path]) -> "SearchResult":
+    def load(cls, path: str | Path) -> SearchResult:
         with open(path, encoding="utf-8") as f:
             data = json.load(f)
         obj = cls(direction=data["direction"])
@@ -78,7 +81,8 @@ class SearchResult:
 
 # ── Grid Search ──────────────────────────────────────────────────────────────
 
-def _grid_combinations(param_grid: Dict[str, List[Any]]) -> Generator[Dict[str, Any], None, None]:
+
+def _grid_combinations(param_grid: dict[str, list[Any]]) -> Generator[dict[str, Any], None, None]:
     """Yield all parameter combinations from a grid spec."""
     keys = list(param_grid.keys())
     values = [param_grid[k] for k in keys]
@@ -87,8 +91,8 @@ def _grid_combinations(param_grid: Dict[str, List[Any]]) -> Generator[Dict[str, 
 
 
 def grid_search(
-    eval_fn: Callable[[Dict[str, Any]], float],
-    param_grid: Dict[str, List[Any]],
+    eval_fn: Callable[[dict[str, Any]], float],
+    param_grid: dict[str, list[Any]],
     direction: str = "minimize",
     verbose: bool = False,
 ) -> SearchResult:
@@ -117,10 +121,11 @@ def grid_search(
 
 # ── Random Search ─────────────────────────────────────────────────────────────
 
+
 def _sample_params(
-    param_space: Dict[str, Any],
+    param_space: dict[str, Any],
     rng: random.Random,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Sample one configuration from param_space.
     Each value is either:
@@ -128,13 +133,13 @@ def _sample_params(
       - A tuple (lo, hi, type):  sample uniform float or int.
       - A callable: call with no args to generate a value.
     """
-    sampled: Dict[str, Any] = {}
+    sampled: dict[str, Any] = {}
     for key, spec in param_space.items():
         if isinstance(spec, list):
             sampled[key] = rng.choice(spec)
         elif isinstance(spec, tuple) and len(spec) == 3:
             lo, hi, kind = spec
-            if kind == int:
+            if kind is int:
                 sampled[key] = rng.randint(int(lo), int(hi))
             else:
                 sampled[key] = lo + rng.random() * (hi - lo)
@@ -146,8 +151,8 @@ def _sample_params(
 
 
 def random_search(
-    eval_fn: Callable[[Dict[str, Any]], float],
-    param_space: Dict[str, Any],
+    eval_fn: Callable[[dict[str, Any]], float],
+    param_space: dict[str, Any],
     n_trials: int = 20,
     direction: str = "minimize",
     seed: int = 42,

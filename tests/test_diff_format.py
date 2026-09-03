@@ -1,11 +1,11 @@
 """Unit tests for native diff format parser and applicator."""
+
 import pytest
+
 from zolt.inference.diff_format import (
-    parse_diff_blocks,
-    apply_diff_edit,
     apply_diff_block,
-    format_diff_block,
-    DiffEdit,
+    apply_diff_edit,
+    parse_diff_blocks,
 )
 
 
@@ -28,13 +28,7 @@ def test_parse_diff_block_with_path():
 
 
 def test_parse_diff_block_without_path():
-    text = (
-        "<search>\n"
-        "const x = 1;\n"
-        "<replace>\n"
-        "const x = 2;\n"
-        "<diff_end>"
-    )
+    text = "<search>\nconst x = 1;\n<replace>\nconst x = 2;\n<diff_end>"
     edits = parse_diff_blocks(text)
     assert len(edits) == 1
     assert edits[0].path is None
@@ -43,12 +37,7 @@ def test_parse_diff_block_without_path():
 
 
 def test_apply_diff_edit_exact_match():
-    source = (
-        "def calculate():\n"
-        "    a = 10\n"
-        "    b = 20\n"
-        "    return a - b\n"
-    )
+    source = "def calculate():\n    a = 10\n    b = 20\n    return a - b\n"
     search = "return a - b"
     replace = "return a + b"
     result = apply_diff_edit(source, search, replace)
@@ -57,6 +46,7 @@ def test_apply_diff_edit_exact_match():
 
 
 # ── Fail-closed regression: Decision (a) ──────────────────────────────────────
+
 
 def test_apply_diff_edit_no_match_raises_error():
     """0-match must raise ValueError, never return a best-effort result."""
@@ -69,11 +59,7 @@ def test_apply_diff_edit_no_match_raises_error():
 
 def test_apply_diff_edit_multiple_matches_raises_error():
     """2+ matches must raise ValueError, never silently pick the first occurrence."""
-    source = (
-        "x = 10\n"
-        "x = 10\n"
-        "y = 20\n"
-    )
+    source = "x = 10\nx = 10\ny = 20\n"
     search = "x = 10"
     replace = "x = 100"
     with pytest.raises(ValueError, match="matched 2 locations"):
@@ -83,20 +69,14 @@ def test_apply_diff_edit_multiple_matches_raises_error():
 def test_apply_diff_edit_zero_match_does_not_modify_source():
     """Confirm no mutation occurs when the search block is absent."""
     source = "a = 1\nb = 2\n"
-    try:
+    with pytest.raises(ValueError):
         apply_diff_edit(source, "c = 3", "c = 99")
-    except ValueError:
-        pass  # expected
     # Source must be untouched (no in-place mutation)
     assert source == "a = 1\nb = 2\n"
 
 
 def test_apply_diff_block_full():
-    source = (
-        "function greet(name) {\n"
-        "  console.log('Hi ' + name);\n"
-        "}\n"
-    )
+    source = "function greet(name) {\n  console.log('Hi ' + name);\n}\n"
     diff = (
         "[greet.js]\n"
         "<search>\n"
@@ -111,10 +91,12 @@ def test_apply_diff_block_full():
 
 # ── Cross-language verified guarantee: Decision (b) ───────────────────────────
 
+
 def test_verified_true_not_emitted_from_heuristic_typescript():
     """TS: verified=True only from tsc, never from heuristic fallback."""
-    from zolt.inference.verify_ts import verify_typescript_code
     import unittest.mock as mock
+
+    from zolt.inference.verify_ts import verify_typescript_code
 
     valid_ts = "const x: string = 'hello';"
     with mock.patch("zolt.inference.verify_ts.shutil.which", return_value=None):
@@ -127,8 +109,9 @@ def test_verified_true_not_emitted_from_heuristic_typescript():
 
 def test_verified_true_not_emitted_from_heuristic_javascript():
     """JS: verified=True only from node/eslint, never from heuristic fallback."""
-    from zolt.inference.verify_js import verify_javascript_code
     import unittest.mock as mock
+
+    from zolt.inference.verify_js import verify_javascript_code
 
     valid_js = "const add = (a, b) => a + b;"
     with mock.patch("zolt.inference.verify_js.shutil.which", return_value=None):
@@ -142,6 +125,7 @@ def test_verified_true_not_emitted_from_heuristic_javascript():
 def test_python_verified_always_true():
     """Python: verified=True always, because ast.parse always runs."""
     from zolt.inference.verify_python import verify_python_code
+
     res = verify_python_code("x = 1 + 2")
     assert res["verified"] is True
     assert res["heuristic"] is False

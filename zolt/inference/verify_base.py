@@ -7,9 +7,11 @@ Each language verifier provides a checker function with the signature:
 The retry orchestration, correction-turn construction, and return shape
 are defined here once and reused by every language-specific verifier.
 """
+
+from collections.abc import Callable
+from dataclasses import dataclass
 import re
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional
+from typing import Any
 
 
 @dataclass
@@ -24,13 +26,14 @@ class VerifyResult:
         error     -- Error string when valid is False; None otherwise.
         checker   -- Name of the checker that produced this result.
     """
+
     valid: bool
     verified: bool
     heuristic: bool = False
-    error: Optional[str] = None
+    error: str | None = None
     checker: str = "unknown"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to plain dict for callers that expect a dict return."""
         return {
             "valid": self.valid,
@@ -84,7 +87,7 @@ def self_correcting_generate(
     temperature: float = 0.5,
     top_p: float = 0.9,
     system_prompt: str = "",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Generic self-correcting generation loop.
 
@@ -93,7 +96,7 @@ def self_correcting_generate(
     Returns the standard result dict: {code, verified, heuristic, attempts, error, checker}.
     """
     current_prompt = prompt
-    last_error: Optional[str] = None
+    last_error: str | None = None
     last_code = ""
     last_checker = "unknown"
 
@@ -104,11 +107,13 @@ def self_correcting_generate(
             include_think_tag=True,
         )
 
-        response_chunks = list(generator.generate_stream(
-            formatted_prompt,
-            temperature=temperature,
-            top_p=top_p,
-        ))
+        response_chunks = list(
+            generator.generate_stream(
+                formatted_prompt,
+                temperature=temperature,
+                top_p=top_p,
+            )
+        )
         response_text = "".join(response_chunks)
         extracted_code = extract_code_block(response_text)
         last_code = extracted_code

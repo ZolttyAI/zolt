@@ -2,30 +2,31 @@
 Native diff format parser and patch application engine using <search>, <replace>, <diff_end> tokens.
 Provides deterministic, fail-closed code modification without whole-file rewrites.
 """
-import re
+
 from dataclasses import dataclass
-from typing import List, Optional
+import re
 
 
 @dataclass
 class DiffEdit:
     """Structured representation of a single code search/replace edit block."""
+
     search: str
     replace: str
-    path: Optional[str] = None
+    path: str | None = None
 
 
-def parse_diff_blocks(diff_text: str) -> List[DiffEdit]:
+def parse_diff_blocks(diff_text: str) -> list[DiffEdit]:
     """
     Parse model output containing <search> ... <replace> ... <diff_end> tags.
     Extracts optional file path preceding the block and exact search/replace contents.
     """
-    edits: List[DiffEdit] = []
+    edits: list[DiffEdit] = []
     # Pattern to capture optional path header followed by <search>...<replace>...<diff_end>
     pattern = re.compile(
-        r'(?:(?:(?:File|Path|Target|===)?\s*[:\[]?([^\n<>\[\]]+\.[a-zA-Z0-9_.-]+)[\]:]?\s*\n))?'
-        r'<search>\n?(.*?)\n?<replace>\n?(.*?)\n?<diff_end>',
-        re.DOTALL
+        r"(?:(?:(?:File|Path|Target|===)?\s*[:\[]?([^\n<>\[\]]+\.[a-zA-Z0-9_.-]+)[\]:]?\s*\n))?"
+        r"<search>\n?(.*?)\n?<replace>\n?(.*?)\n?<diff_end>",
+        re.DOTALL,
     )
 
     for match in pattern.finditer(diff_text):
@@ -53,9 +54,7 @@ def apply_diff_edit(source: str, search: str, replace: str) -> str:
 
     matches = source_norm.count(search_norm)
     if matches == 0:
-        raise ValueError(
-            f"Search block not found in source text.\nSearch block:\n{search_norm}"
-        )
+        raise ValueError(f"Search block not found in source text.\nSearch block:\n{search_norm}")
     if matches > 1:
         raise ValueError(
             f"Search block matched {matches} locations in source text. Must match uniquely to avoid ambiguous edits.\nSearch block:\n{search_norm}"
@@ -80,7 +79,7 @@ def apply_diff_block(source: str, diff_text: str) -> str:
     return current
 
 
-def format_diff_block(search: str, replace: str, path: Optional[str] = None) -> str:
+def format_diff_block(search: str, replace: str, path: str | None = None) -> str:
     """Format an edit block into standard zolt diff special tokens."""
     header = f"[{path}]\n" if path else ""
     return f"{header}<search>\n{search}\n<replace>\n{replace}\n<diff_end>"

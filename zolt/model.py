@@ -1,5 +1,5 @@
 import math
-from typing import Optional, Tuple, List, Union, Dict, Any
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -27,9 +27,9 @@ def precompute_freqs_cis(
     dim: int,
     end: int,
     theta: float = 10000.0,
-    scaling_type: Optional[str] = None,
+    scaling_type: str | None = None,
     scaling_factor: float = 1.0,
-) -> Tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Precompute RoPE (Rotary Position Embedding) cos and sin values with optional scaling for context extension.
     """
@@ -53,7 +53,7 @@ def apply_rotary_emb(
     xk: torch.Tensor,
     cos: torch.Tensor,
     sin: torch.Tensor,
-) -> Tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Apply rotary embeddings to query and key tensors.
     xq, xk shape: [batch_size, seq_len, n_heads, head_dim]
@@ -97,12 +97,15 @@ class SwiGLUFFN(nn.Module):
     def __init__(self, config: ZoltConfig):
         super().__init__()
         self.dim = config.dim
-        self.hidden_dim = config.hidden_dim
-        self.w1 = nn.Linear(config.dim, config.hidden_dim, bias=False)
-        self.w2 = nn.Linear(config.hidden_dim, config.dim, bias=False)
-        self.w3 = nn.Linear(config.dim, config.hidden_dim, bias=False)
+        hidden_dim = (
+            config.hidden_dim if config.hidden_dim is not None else int(2 / 3 * 4 * config.dim)
+        )
+        self.hidden_dim = hidden_dim
+        self.w1 = nn.Linear(config.dim, hidden_dim, bias=False)
+        self.w2 = nn.Linear(hidden_dim, config.dim, bias=False)
+        self.w3 = nn.Linear(config.dim, hidden_dim, bias=False)
 
-    def forward(self, x: torch.Tensor, active_dim: Optional[int] = None) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, active_dim: int | None = None) -> torch.Tensor:
         if active_dim is not None and active_dim < self.dim:
             # MatFormer slicing
             w1_slice = self.w1.weight[: (active_dim * 8 // 3), :active_dim]
@@ -129,13 +132,14 @@ class Attention(nn.Module):
         super().__init__()
         self.dim = config.dim
         self.n_heads = config.n_heads
-        self.n_kv_heads = config.n_kv_heads
-        self.n_rep = self.n_heads // self.n_kv_heads
+        n_kv_heads = config.n_kv_heads if config.n_kv_heads is not None else config.n_heads
+        self.n_kv_heads = n_kv_heads
+        self.n_rep = self.n_heads // n_kv_heads
         self.head_dim = config.dim // config.n_heads
 
         self.wq = nn.Linear(config.dim, config.n_heads * self.head_dim, bias=False)
-        self.wk = nn.Linear(config.dim, config.n_kv_heads * self.head_dim, bias=False)
-        self.wv = nn.Linear(config.dim, config.n_kv_heads * self.head_dim, bias=False)
+        self.wk = nn.Linear(config.dim, n_kv_heads * self.head_dim, bias=False)
+        self.wv = nn.Linear(config.dim, n_kv_heads * self.head_dim, bias=False)
         self.wo = nn.Linear(config.n_heads * self.head_dim, config.dim, bias=False)
 
     def forward(
@@ -143,7 +147,7 @@ class Attention(nn.Module):
         x: torch.Tensor,
         cos: torch.Tensor,
         sin: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
+        mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         bsz, seqlen, _ = x.shape
 
@@ -192,8 +196,8 @@ class ZoltTransformerBlock(nn.Module):
         x: torch.Tensor,
         cos: torch.Tensor,
         sin: torch.Tensor,
-        mask: Optional[torch.Tensor] = None,
-        active_dim: Optional[int] = None,
+        mask: torch.Tensor | None = None,
+        active_dim: int | None = None,
     ) -> torch.Tensor:
         h = x + self.attention(self.attention_norm(x), cos, sin, mask=mask)
         out = h + self.feed_forward(self.ffn_norm(h), active_dim=active_dim)
@@ -225,9 +229,9 @@ class ZoltTransformer(nn.Module):
     def forward(
         self,
         input_ids: torch.Tensor,
-        active_dim: Optional[int] = None,
+        active_dim: int | None = None,
     ) -> torch.Tensor:
-        bsz, seqlen = input_ids.shape
+        _bsz, _seqlen = input_ids.shape
         h = self.tok_embeddings(input_ids)
 
         for layer in self.layers:
@@ -261,9 +265,9 @@ class ZoltForCausalLM(nn.Module):
     def forward(
         self,
         input_ids: torch.Tensor,
-        labels: Optional[torch.Tensor] = None,
-        active_dim: Optional[int] = None,
-    ) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        labels: torch.Tensor | None = None,
+        active_dim: int | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
         hidden_states = self.model(input_ids, active_dim=active_dim)
         logits = self.lm_head(hidden_states)
 
@@ -284,7 +288,7 @@ class ZoltForCausalLM(nn.Module):
     def encode(
         self,
         input_ids: torch.Tensor,
-        active_dim: Optional[int] = None,
+        active_dim: int | None = None,
         pool: str = "last",
     ) -> torch.Tensor:
         """
@@ -310,7 +314,7 @@ class ZoltForCausalLM(nn.Module):
         max_new_tokens: int = 100,
         temperature: float = 0.7,
         top_p: float = 0.9,
-        eos_token_id: Optional[int] = None,
+        eos_token_id: int | None = None,
     ) -> torch.Tensor:
         """Autoregressive generation with temperature and top-p sampling."""
         if eos_token_id is None:

@@ -5,14 +5,13 @@ Pure PyTorch/NumPy implementation with no sklearn dependency.
 Default k=8. Centroids are L2-normalized before distance computation
 to operate on cosine geometry, matching how zolt embeddings are used elsewhere.
 """
+
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 import torch
-import numpy as np
 
 
 class KMeansCluster:
@@ -38,14 +37,14 @@ class KMeansCluster:
         self.tol = tol
         self.batch_size = batch_size
         self.seed = seed
-        self.centroids: Optional[torch.Tensor] = None  # (k, dim), L2-normalized
+        self.centroids: torch.Tensor | None = None  # (k, dim), L2-normalized
         self.inertia_: float = float("inf")
         self.n_iter_: int = 0
 
     @staticmethod
     def _normalize(x: torch.Tensor) -> torch.Tensor:
         """L2-normalize along the last dimension."""
-        return F.normalize(x, p=2, dim=-1) if False else x / (x.norm(dim=-1, keepdim=True) + 1e-12)
+        return x / (x.norm(dim=-1, keepdim=True) + 1e-12)
 
     def _init_centroids(self, x: torch.Tensor) -> torch.Tensor:
         """K-means++ initialization for stable convergence."""
@@ -53,17 +52,17 @@ class KMeansCluster:
         gen.manual_seed(self.seed)
         n = x.shape[0]
         # Pick first centroid randomly
-        first = torch.randint(n, (1,), generator=gen).item()
+        first = int(torch.randint(n, (1,), generator=gen).item())
         centroids = [x[first]]
 
         for _ in range(1, self.n_clusters):
             # Distance from each point to nearest centroid
             stack = torch.stack(centroids, dim=0)  # (k_so_far, dim)
-            dists = 1.0 - (x @ stack.T)            # cosine distance, (n, k_so_far)
-            min_dists = dists.min(dim=1).values    # (n,)
+            dists = 1.0 - (x @ stack.T)  # cosine distance, (n, k_so_far)
+            min_dists = dists.min(dim=1).values  # (n,)
             min_dists = min_dists.clamp(min=0.0)
             probs = min_dists / (min_dists.sum() + 1e-12)
-            chosen = torch.multinomial(probs, 1, generator=gen).item()
+            chosen = int(torch.multinomial(probs, 1, generator=gen).item())
             centroids.append(x[chosen])
 
         return self._normalize(torch.stack(centroids, dim=0))
@@ -73,30 +72,33 @@ class KMeansCluster:
         sims = x @ centroids.T  # (n, k)
         return sims.argmax(dim=-1)
 
-    def fit(self, embeddings: torch.Tensor, verbose: bool = False) -> "KMeansCluster":
+    def fit(self, embeddings: torch.Tensor, verbose: bool = False) -> KMeansCluster:
         """
         Fit K-means on the provided embedding matrix (n_samples, dim).
         Runs n_init random restarts and keeps the best inertia.
         """
         x = self._normalize(embeddings.float())
-        n, dim = x.shape
+        n, _dim = x.shape
         best_centroids = None
         best_inertia = float("inf")
 
         for init_idx in range(self.n_init):
             torch.manual_seed(self.seed + init_idx)
             centroids = self._init_centroids(x)
+            last_iter = 0
 
             for iteration in range(self.max_iter):
+                last_iter = iteration
                 # Mini-batch assignment
                 all_assignments = torch.zeros(n, dtype=torch.long)
                 for start in range(0, n, self.batch_size):
                     batch = x[start : start + self.batch_size]
-                    all_assignments[start : start + self.batch_size] = self._assign(batch, centroids)
+                    sims = torch.mm(batch, centroids.T)
+                    all_assignments[start : start + self.batch_size] = sims.argmax(dim=-1)
 
-                # Recompute centroids
+                # Centroid update
                 new_centroids = torch.zeros_like(centroids)
-                counts = torch.zeros(self.n_clusters, dtype=torch.float)
+                counts = torch.zeros(self.n_clusters, device=x.device)
                 for k in range(self.n_clusters):
                     mask = all_assignments == k
                     if mask.any():
@@ -104,7 +106,8 @@ class KMeansCluster:
                         counts[k] = mask.sum().float()
                     else:
                         # Dead cluster: reinitialize to a random point
-                        new_centroids[k] = x[torch.randint(n, (1,)).item()]
+                        dead_idx = int(torch.randint(n, (1,)).item())
+                        new_centroids[k] = x[dead_idx]
                 new_centroids = self._normalize(new_centroids)
 
                 shift = (new_centroids - centroids).norm(dim=-1).max().item()
@@ -123,7 +126,7 @@ class KMeansCluster:
             if inertia < best_inertia:
                 best_inertia = inertia
                 best_centroids = centroids.clone()
-                self.n_iter_ = iteration + 1
+                self.n_iter_ = last_iter + 1
 
         self.centroids = best_centroids
         self.inertia_ = best_inertia
@@ -150,7 +153,7 @@ class KMeansCluster:
         sims = (x @ self.centroids.T).squeeze(0)
         return 1.0 - sims  # cosine distance
 
-    def save(self, path: Union[str, Path]) -> None:
+    def save(self, path: str | Path) -> None:
         """Save centroids and configuration to disk."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -165,7 +168,7 @@ class KMeansCluster:
         )
 
     @classmethod
-    def load(cls, path: Union[str, Path]) -> "KMeansCluster":
+    def load(cls, path: str | Path) -> KMeansCluster:
         """Load a fitted KMeansCluster from disk."""
         data = torch.load(path, map_location="cpu")
         obj = cls(n_clusters=data["n_clusters"])
@@ -177,9 +180,9 @@ class KMeansCluster:
 
 def extract_embeddings(
     model: Any,
-    token_batches: List[torch.Tensor],
+    token_batches: list[torch.Tensor],
     device: torch.device,
-    active_dim: Optional[int] = None,
+    active_dim: int | None = None,
     pool: str = "last",
 ) -> torch.Tensor:
     """
@@ -204,4 +207,3 @@ def extract_embeddings(
             emb = model.encode(tokens, active_dim=active_dim, pool=pool)
             embeddings.append(emb.cpu())
     return torch.cat(embeddings, dim=0)
-

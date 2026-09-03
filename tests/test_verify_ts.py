@@ -2,12 +2,12 @@
 Tests for verify_ts.py after refactor onto verify_base.
 All existing external behaviour must be unchanged.
 """
-import pytest
+
 from zolt.inference.verify_ts import (
-    verify_typescript_code,
     extract_code_block,
-    self_correcting_generate_ts,
     run_tsc_check,
+    self_correcting_generate_ts,
+    verify_typescript_code,
 )
 
 
@@ -64,7 +64,6 @@ def test_verified_true_only_from_tool_or_heuristic_passes():
     verified=True is reserved for actual tsc runs.
     This test patches shutil.which to simulate absent tsc.
     """
-    import shutil
     import unittest.mock as mock
 
     valid_ts = "const x: number = 1;"

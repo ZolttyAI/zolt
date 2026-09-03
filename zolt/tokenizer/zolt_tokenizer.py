@@ -1,14 +1,10 @@
 """
 Tokenizer interface with zolt special tokens for reasoning and coding agent interactions.
 """
+
 from __future__ import annotations
 
-import json
-from pathlib import Path
-from typing import List, Optional, Union
-
 from tokenizers import Tokenizer as HFTokenizer
-
 
 SPECIAL_TOKEN_MAP = {
     "pad_token": "<pad>",
@@ -58,18 +54,18 @@ class ZoltTokenizer:
         self,
         text: str,
         add_special_tokens: bool = True,
-    ) -> List[int]:
+    ) -> list[int]:
         enc = self._tokenizer.encode(text, add_special_tokens=add_special_tokens)
         return enc.ids
 
     def decode(
         self,
-        ids: List[int],
+        ids: list[int],
         skip_special_tokens: bool = False,
     ) -> str:
         return self._tokenizer.decode(ids, skip_special_tokens=skip_special_tokens)
 
-    def batch_encode(self, texts: List[str], add_special_tokens: bool = True) -> List[List[int]]:
+    def batch_encode(self, texts: list[str], add_special_tokens: bool = True) -> list[list[int]]:
         self._tokenizer.enable_padding()
         self._tokenizer.enable_truncation(max_length=32768)
         encodings = self._tokenizer.encode_batch(texts, add_special_tokens=add_special_tokens)
@@ -91,7 +87,7 @@ class ZoltTokenizer:
         return f"ZoltTokenizer(vocab_size={self.vocab_size})"
 
     @classmethod
-    def from_pretrained(cls, path: str) -> "ZoltTokenizer":
+    def from_pretrained(cls, path: str) -> ZoltTokenizer:
         return cls(path)
 
 

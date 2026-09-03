@@ -3,27 +3,28 @@ Structured, restricted database call parser and schema validator.
 Validates <db_call>...</db_call> blocks against a strict schema (dialect, operation, table, constraints).
 Restricted strictly to: postgresql | sqlite | mariadb | mysql.
 """
-import re
-import json
+
 from dataclasses import dataclass
-from typing import Dict, Any, List, Optional, Union, Set
+import json
+import re
+from typing import Any
 
-
-SUPPORTED_DIALECTS: Set[str] = {"postgresql", "sqlite", "mariadb", "mysql"}
-SUPPORTED_OPERATIONS: Set[str] = {"select", "insert", "update", "delete", "create", "alter", "drop"}
-REQUIRED_KEYS: Set[str] = {"dialect", "operation", "table", "constraints"}
+SUPPORTED_DIALECTS: set[str] = {"postgresql", "sqlite", "mariadb", "mysql"}
+SUPPORTED_OPERATIONS: set[str] = {"select", "insert", "update", "delete", "create", "alter", "drop"}
+REQUIRED_KEYS: set[str] = {"dialect", "operation", "table", "constraints"}
 
 
 @dataclass
 class DBCallPayload:
     """Validated structured database call payload."""
+
     dialect: str
     operation: str
     table: str
-    constraints: Union[Dict[str, Any], List[Any], str]
+    constraints: dict[str, Any] | list[Any] | str
 
 
-def validate_db_call(payload: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
+def validate_db_call(payload: str | dict[str, Any]) -> dict[str, Any]:
     """
     Validate a database call payload against the restricted schema.
     Fail-closed validation: rejects missing keys, unsupported dialects, or invalid operations.
@@ -39,19 +40,27 @@ def validate_db_call(payload: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
         return {"valid": False, "payload": None, "error": f"Invalid payload type: {type(payload)}"}
 
     if not isinstance(parsed, dict):
-        return {"valid": False, "payload": None, "error": "Database call payload must be a JSON object."}
+        return {
+            "valid": False,
+            "payload": None,
+            "error": "Database call payload must be a JSON object.",
+        }
 
     # Check required keys
     missing_keys = REQUIRED_KEYS - set(parsed.keys())
     if missing_keys:
-        return {"valid": False, "payload": None, "error": f"Missing required keys in db_call: {sorted(list(missing_keys))}"}
+        return {
+            "valid": False,
+            "payload": None,
+            "error": f"Missing required keys in db_call: {sorted(missing_keys)}",
+        }
 
     dialect = str(parsed.get("dialect", "")).lower().strip()
     if dialect not in SUPPORTED_DIALECTS:
         return {
             "valid": False,
             "payload": None,
-            "error": f"Unsupported SQL dialect '{dialect}'. Supported dialects: {sorted(list(SUPPORTED_DIALECTS))}",
+            "error": f"Unsupported SQL dialect '{dialect}'. Supported dialects: {sorted(SUPPORTED_DIALECTS)}",
         }
 
     operation = str(parsed.get("operation", "")).lower().strip()
@@ -59,7 +68,7 @@ def validate_db_call(payload: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
         return {
             "valid": False,
             "payload": None,
-            "error": f"Unsupported SQL operation '{operation}'. Supported operations: {sorted(list(SUPPORTED_OPERATIONS))}",
+            "error": f"Unsupported SQL operation '{operation}'. Supported operations: {sorted(SUPPORTED_OPERATIONS)}",
         }
 
     table = parsed.get("table")
@@ -80,7 +89,7 @@ def validate_db_call(payload: Union[str, Dict[str, Any]]) -> Dict[str, Any]:
     return {"valid": True, "payload": validated_obj, "error": None}
 
 
-def parse_db_calls(text: str) -> List[Dict[str, Any]]:
+def parse_db_calls(text: str) -> list[dict[str, Any]]:
     """
     Extract and validate all <db_call> ... </db_call> blocks from text.
     Returns list of validation results for each found block.

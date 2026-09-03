@@ -2,21 +2,22 @@
 zolt training loop.
 Supports bf16 mixed precision, AdamW, cosine LR schedule, and gradient clipping.
 """
-import os
-import math
-import time
-import json
+
 import argparse
+import json
+import math
+import os
 from pathlib import Path
-from typing import Optional, List
+import time
+from typing import Optional
 
 import torch
-import torch.nn as nn
 from torch.amp import GradScaler, autocast
+import torch.nn as nn
 
 from zolt.config import ZoltConfig
-from zolt.model import ZoltForCausalLM
 from zolt.data.dataset import build_dataloader
+from zolt.model import ZoltForCausalLM
 
 
 def get_cosine_lr(
@@ -57,9 +58,9 @@ def save_checkpoint(
 
 
 def train(
-    token_files: List[str],
+    token_files: list[str],
     output_dir: str = "./checkpoints",
-    preset: Optional[str] = None,
+    preset: str | None = None,
     config: Optional["ZoltConfig"] = None,
     max_seq_len: int = 4096,
     batch_size: int = 8,
@@ -67,14 +68,14 @@ def train(
     lr: float = 3e-4,
     lr_min: float = 3e-5,
     warmup_steps: int = 500,
-    total_steps: Optional[int] = None,
+    total_steps: int | None = None,
     tokens_per_param_ratio: float = 75.0,
     weight_decay: float = 0.1,
     grad_clip: float = 1.0,
     save_every: int = 1000,
     log_every: int = 50,
     curriculum: bool = False,
-    resume_from: Optional[str] = None,
+    resume_from: str | None = None,
     use_wandb: bool = False,
     wandb_project: str = "zolt-ai",
     dtype: str = "bf16",  # "bf16", "fp16", or "fp32"
@@ -96,7 +97,9 @@ def train(
     model = ZoltForCausalLM(config).to(device)
 
     n_params = count_parameters(model)
-    print(f"[zolt-train] Parameters: {n_params:,} ({n_params/1e6:.1f}M) [preset: {preset or 'default'}]")
+    print(
+        f"[zolt-train] Parameters: {n_params:,} ({n_params / 1e6:.1f}M) [preset: {preset or 'default'}]"
+    )
 
     # ─── Overtraining & Token Budget Calculation ────────────────────────────
     tokens_per_step = batch_size * grad_accum_steps * max_seq_len
@@ -107,7 +110,7 @@ def train(
     regime = "overtraining" if tokens_per_param_ratio > 30.0 else "chinchilla-optimal"
     print(
         f"[zolt-train] Regime: {regime} ({tokens_per_param_ratio:.1f}x tokens/param) | "
-        f"Target token budget: {target_token_budget:,} ({target_token_budget/1e9:.2f}B tokens) | "
+        f"Target token budget: {target_token_budget:,} ({target_token_budget / 1e9:.2f}B tokens) | "
         f"Total steps: {total_steps:,} ({tokens_per_step:,} tok/step) | Curriculum: {curriculum}"
     )
 
@@ -134,8 +137,12 @@ def train(
     start_step = 0
     if resume_from:
         print(f"[zolt-train] Resuming from: {resume_from}")
-        model.load_state_dict(torch.load(os.path.join(resume_from, "model.pt"), map_location=device))
-        optimizer.load_state_dict(torch.load(os.path.join(resume_from, "optimizer.pt"), map_location=device))
+        model.load_state_dict(
+            torch.load(os.path.join(resume_from, "model.pt"), map_location=device)
+        )
+        optimizer.load_state_dict(
+            torch.load(os.path.join(resume_from, "optimizer.pt"), map_location=device)
+        )
         with open(os.path.join(resume_from, "train_state.json")) as f:
             state = json.load(f)
         start_step = state["step"]
@@ -143,6 +150,7 @@ def train(
     # ─── WandB ──────────────────────────────────────────────────────────────
     if use_wandb:
         import wandb
+
         wandb.init(
             project=wandb_project,
             config=config.to_dict(),
@@ -174,7 +182,7 @@ def train(
             param_group["lr"] = current_lr
 
         # Forward & Backward with Gradient Accumulation
-        for micro_step in range(grad_accum_steps):
+        for _micro_step in range(grad_accum_steps):
             try:
                 batch = next(data_iter)
             except StopIteration:
@@ -223,13 +231,21 @@ def train(
             )
             if use_wandb:
                 import wandb
+
                 wandb.log({"loss": avg_loss, "lr": current_lr, "step": step})
             running_loss = 0.0
             t0 = time.time()
 
         # ─── Checkpoint ─────────────────────────────────────────────────────
         if step % save_every == 0:
-            save_checkpoint(model, optimizer, step, avg_loss if step % log_every == 0 else 0.0, config, output_dir)
+            save_checkpoint(
+                model,
+                optimizer,
+                step,
+                avg_loss if step % log_every == 0 else 0.0,
+                config,
+                output_dir,
+            )
 
     # Final checkpoint
     save_checkpoint(model, optimizer, step, 0.0, config, output_dir)
@@ -238,17 +254,36 @@ def train(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="zolt Training Script")
-    parser.add_argument("--token_files", nargs="+", required=True, help="Preprocessed .bin token files")
+    parser.add_argument(
+        "--token_files", nargs="+", required=True, help="Preprocessed .bin token files"
+    )
     parser.add_argument("--output_dir", default="./checkpoints", help="Checkpoint directory")
-    parser.add_argument("--preset", default=None, choices=["zolt-mini", "zolt", "125m", "250m"], help="Named architecture preset ('zolt-mini' or 'zolt')")
+    parser.add_argument(
+        "--preset",
+        default=None,
+        choices=["zolt-mini", "zolt", "125m", "250m"],
+        help="Named architecture preset ('zolt-mini' or 'zolt')",
+    )
     parser.add_argument("--max_seq_len", type=int, default=4096)
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--grad_accum", type=int, default=4)
     parser.add_argument("--lr", type=float, default=3e-4)
     parser.add_argument("--warmup_steps", type=int, default=500)
-    parser.add_argument("--total_steps", type=int, default=None, help="Explicit total steps (or computed from tokens_per_param_ratio)")
-    parser.add_argument("--tokens_per_param_ratio", type=float, default=75.0, help="Tokens/parameter overtraining ratio (50x - 100x)")
-    parser.add_argument("--curriculum", action="store_true", help="Enable progressive complexity curriculum sorting")
+    parser.add_argument(
+        "--total_steps",
+        type=int,
+        default=None,
+        help="Explicit total steps (or computed from tokens_per_param_ratio)",
+    )
+    parser.add_argument(
+        "--tokens_per_param_ratio",
+        type=float,
+        default=75.0,
+        help="Tokens/parameter overtraining ratio (50x - 100x)",
+    )
+    parser.add_argument(
+        "--curriculum", action="store_true", help="Enable progressive complexity curriculum sorting"
+    )
     parser.add_argument("--save_every", type=int, default=1000)
     parser.add_argument("--log_every", type=int, default=50)
     parser.add_argument("--resume_from", default=None)

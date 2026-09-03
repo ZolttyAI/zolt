@@ -13,3 +13,13 @@ z1_tokenizer.json
 .env
 wandb/
 .pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+zolt_tokenizer.json
+audit.json
+bandit-report.json
+trivy-report.json
+.mypy_cache/
+.ruff_cache/
+

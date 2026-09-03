@@ -3,20 +3,23 @@ Synthetic dataset generator for structured database calls (<db_call>).
 Produces examples contrasting SQL dialect nuances strictly across PostgreSQL, SQLite, MariaDB, and MySQL.
 Explicitly out of scope: NoSQL, schema-design optimization.
 """
-import json
+
 import argparse
+import json
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
-from zolt.inference.db_call import format_db_call, SUPPORTED_DIALECTS
+from zolt.inference.db_call import format_db_call
 
-
-DIALECT_EXAMPLES = [
+DIALECT_EXAMPLES: list[dict[str, Any]] = [
     {
         "dialect": "postgresql",
         "operation": "insert",
         "table": "users",
-        "constraints": {"on_conflict": "DO UPDATE SET updated_at = NOW()", "returning": ["id", "created_at"]},
+        "constraints": {
+            "on_conflict": "DO UPDATE SET updated_at = NOW()",
+            "returning": ["id", "created_at"],
+        },
         "reasoning": "PostgreSQL supports ON CONFLICT (upsert) and RETURNING clauses for atomic insert-and-fetch operations.",
         "sql": "INSERT INTO users (email, name) VALUES ('user@example.com', 'Dev') ON CONFLICT (email) DO UPDATE SET updated_at = NOW() RETURNING id, created_at;",
     },
@@ -32,7 +35,9 @@ DIALECT_EXAMPLES = [
         "dialect": "mysql",
         "operation": "insert",
         "table": "users",
-        "constraints": {"on_duplicate": "UPDATE name = VALUES(name), updated_at = CURRENT_TIMESTAMP"},
+        "constraints": {
+            "on_duplicate": "UPDATE name = VALUES(name), updated_at = CURRENT_TIMESTAMP"
+        },
         "reasoning": "MySQL uses ON DUPLICATE KEY UPDATE syntax rather than SQL-standard ON CONFLICT.",
         "sql": "INSERT INTO users (email, name) VALUES ('user@example.com', 'Dev') ON DUPLICATE KEY UPDATE name = VALUES(name), updated_at = CURRENT_TIMESTAMP;",
     },
@@ -56,7 +61,13 @@ DIALECT_EXAMPLES = [
         "dialect": "sqlite",
         "operation": "create",
         "table": "settings",
-        "constraints": {"columns": {"key": "TEXT PRIMARY KEY", "value": "TEXT NOT NULL", "updated_at": "DATETIME DEFAULT CURRENT_TIMESTAMP"}},
+        "constraints": {
+            "columns": {
+                "key": "TEXT PRIMARY KEY",
+                "value": "TEXT NOT NULL",
+                "updated_at": "DATETIME DEFAULT CURRENT_TIMESTAMP",
+            }
+        },
         "reasoning": "SQLite uses dynamic type affinity with standard type declarations.",
         "sql": "CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);",
     },
@@ -64,7 +75,10 @@ DIALECT_EXAMPLES = [
         "dialect": "mysql",
         "operation": "update",
         "table": "orders",
-        "constraints": {"set": {"status": "'shipped'"}, "where": {"order_id": 1024, "status": "'pending'"}},
+        "constraints": {
+            "set": {"status": "'shipped'"},
+            "where": {"order_id": 1024, "status": "'pending'"},
+        },
         "reasoning": "MySQL UPDATE syntax with indexed WHERE conditions for consistent isolation.",
         "sql": "UPDATE orders SET status = 'shipped' WHERE order_id = 1024 AND status = 'pending';",
     },
@@ -79,19 +93,19 @@ DIALECT_EXAMPLES = [
 ]
 
 
-def generate_db_call_examples(n_copies: int = 10) -> List[Dict[str, Any]]:
+def generate_db_call_examples(n_copies: int = 10) -> list[dict[str, Any]]:
     """Generate synthetic training records demonstrating structured DB calls."""
     records = []
     for _ in range(n_copies):
         for ex in DIALECT_EXAMPLES:
             db_block = format_db_call(
-                dialect=ex["dialect"],
-                operation=ex["operation"],
-                table=ex["table"],
+                dialect=str(ex["dialect"]),
+                operation=str(ex["operation"]),
+                table=str(ex["table"]),
                 constraints=ex["constraints"],
             )
 
-            prompt = f"Execute a {ex['operation']} operation on the '{ex['table']}' table using {ex['dialect'].capitalize()}."
+            prompt = f"Execute a {ex['operation']} operation on the '{ex['table']}' table using {str(ex['dialect']).capitalize()}."
             content = (
                 f"<|im_start|>user\n{prompt}<|im_end|>\n"
                 f"<|im_start|>assistant\n"
@@ -100,13 +114,15 @@ def generate_db_call_examples(n_copies: int = 10) -> List[Dict[str, Any]]:
                 f"<code>\n{ex['sql']}\n</code><|im_end|>"
             )
 
-            records.append({
-                "content": content,
-                "lang": "sql",
-                "license": "synthetic",
-                "quality_score": 1.0,
-                "dialect": ex["dialect"],
-            })
+            records.append(
+                {
+                    "content": content,
+                    "lang": "sql",
+                    "license": "synthetic",
+                    "quality_score": 1.0,
+                    "dialect": ex["dialect"],
+                }
+            )
 
     return records
 
@@ -121,13 +137,17 @@ def save_synthetic_db_dataset(output_path: str, n_copies: int = 10) -> int:
         for r in records:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
-    print(f"[zolt-db-synth] Generated {len(records)} SQL dialect synthetic instances -> {output_path}")
+    print(
+        f"[zolt-db-synth] Generated {len(records)} SQL dialect synthetic instances -> {output_path}"
+    )
     return len(records)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="zolt SQL Dialect Synthetic Data Generator")
-    parser.add_argument("--output", default="data/distilled/db_calls_synthetic.jsonl", help="Output JSONL path")
+    parser.add_argument(
+        "--output", default="data/distilled/db_calls_synthetic.jsonl", help="Output JSONL path"
+    )
     parser.add_argument("--copies", type=int, default=10, help="Number of repetitions per example")
     args = parser.parse_args()
 
